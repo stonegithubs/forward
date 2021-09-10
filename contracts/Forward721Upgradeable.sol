@@ -11,7 +11,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./interface/IHedgehogFactory.sol";
 
-contract Forward721Upgradeable is OwnableUpgradeable {
+contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using SafeMathUpgradeable for uint;
@@ -355,6 +355,7 @@ contract Forward721Upgradeable is OwnableUpgradeable {
 
     // Non-standard ERC721 projects:  https://docs.niftex.org/general/supported-nfts
     // implementation refers to: https://github.com/NFTX-project/nftx-protocol-v2/blob/master/contracts/solidity/NFTXVaultUpgradeable.sol#L444
+    // TODO: improve implemention to include more non-standard ERC721 impl and change standard to safe-(invoke) way
     function _pushERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
         address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
         address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
