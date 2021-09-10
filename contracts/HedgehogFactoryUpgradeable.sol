@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.0;
 
-// ERC721
 import "./proxy/beacon/UpgradeableBeacon.sol";
 import "./proxy/beacon/BeaconProxy.sol";
 import "./interface/IHedgehogFactory.sol";
@@ -14,8 +13,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     uint256 public fee;
     uint256 public constant Base = 10000;
     
-    address[] public supportedCoins;
-    mapping(address => int) public enabledCoins;
+    address[] public enabledTokens;
+    mapping(address => int) public supportedTokens;
     
     address public override feeCollector;
 
@@ -25,7 +24,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     event PoolCreated(
         address indexed nftAddr,
         uint poolType,
-        address liquidationCoin,
+        address marginToken,
         uint index
     );
 
@@ -36,17 +35,17 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
     function initialize(
         address _forward721Imp,
-        address[] memory _liquidationCoins, 
+        address[] memory _marginTokens, 
         address _feeCollector,
         uint _fee
     ) public initializer {
         __UpgradeableBeacon__init(_forward721Imp);
 
 
-        supportedCoins.push(address(0));
-        for (uint i = 0; i < _liquidationCoins.length; i++) {
-            supportedCoins.push(_liquidationCoins[i]);
-            enabledCoins[_liquidationCoins[i]] = int(i + 1);
+        enabledTokens.push(address(0));
+        for (uint i = 0; i < _marginTokens.length; i++) {
+            enabledTokens.push(_marginTokens[i]);
+            supportedTokens[_marginTokens[i]] = int(i + 1);
         }
 
         feeCollector = _feeCollector;
@@ -54,25 +53,25 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         fee = _fee;
     }
 
-    function enableCoin(address coin) external onlyOwner {
-        require(coin != address(0), "!0x00");
+    function supportToken(address _token) external onlyOwner {
+        require(_token != address(0), "!0x00");
 
-        require(!ifCoinEnabled(coin), "enabled");
-        if (uint(enabledCoins[coin]) == 0) {
-            supportedCoins.push(coin);
-            enabledCoins[coin] = int(supportedCoins.length);
+        require(!ifTokenSupported(_token), "supported already");
+        if (uint(supportedTokens[_token]) == 0) {
+            enabledTokens.push(_token);
+            supportedTokens[_token] = int(enabledTokens.length);
         } else {
-            enabledCoins[coin] = -enabledCoins[coin];
+            supportedTokens[_token] = -supportedTokens[_token];
         }
 
     }
-    function disableCoin(address coin) external onlyOwner {
+    function disableToken(address _token) external onlyOwner {
 
-        require(coin != address(0), "!0x00");
+        require(_token != address(0), "!0x00");
 
-        require(ifCoinEnabled(coin), "disabled");
+        require(ifTokenSupported(_token), "disabled already");
 
-        enabledCoins[coin] = -enabledCoins[coin];
+        supportedTokens[_token] = -supportedTokens[_token];
 
     }
 
@@ -87,8 +86,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     }
 
 
-    function ifCoinEnabled(address coin) public view override returns (bool) {
-        return coin == address(0) || enabledCoins[coin] > 0;
+    function ifTokenSupported(address _token) public view override returns (bool) {
+        return _token == address(0) || supportedTokens[_token] > 0;
     }
 
     function getOperationFee() external view override returns (uint, uint) {
@@ -102,9 +101,9 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     function deployPool(
         address _nftAddr,
         uint _poolType,
-        address _liquidationCoin
+        address _marginToken
     ) external {
-        require(getPair[_nftAddr][_liquidationCoin] == address(0), "pool exist"); // single check is sufficient
+        require(getPair[_nftAddr][_marginToken] == address(0), "pool exist"); // single check is sufficient
 
         address beaconProxyAddr;
         if (_poolType == 721) {
@@ -114,18 +113,18 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
             // address beaconProxyAddr = address(new BeaconProxy(address(this), ""));
 
             // Method 2: 
-            bytes32 salt = keccak256(abi.encodePacked(_nftAddr, _poolType, _liquidationCoin));
+            bytes32 salt = keccak256(abi.encodePacked(_nftAddr, _poolType, _marginToken));
             beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
             
             
-            Forward721Upgradeable(beaconProxyAddr).initialize(_nftAddr, _poolType, _liquidationCoin);
+            Forward721Upgradeable(beaconProxyAddr).initialize(_nftAddr, _poolType, _marginToken);
 
         } else {
             revert("!support");
         }
 
-        getPair[_nftAddr][_liquidationCoin] = beaconProxyAddr;
-        getPair[_liquidationCoin][_nftAddr] = beaconProxyAddr;
+        getPair[_nftAddr][_marginToken] = beaconProxyAddr;
+        getPair[_marginToken][_nftAddr] = beaconProxyAddr;
 
         emit PoolCreated(_nftAddr, _poolType, beaconProxyAddr, allPairs.length);
     }

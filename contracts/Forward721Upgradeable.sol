@@ -17,7 +17,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     using SafeMathUpgradeable for uint;
 
     address public nftAddr;
-    address public liquidationAsset;
+    address public marginToken;
     uint public cfee;
 
     enum OrderState { active, dead, fill, challenge, unsettle, settle }
@@ -77,7 +77,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     function initialize(
         address _nftAddr,
         uint _poolType,
-        address _liquidationAsset
+        address _marginToken
     ) public initializer {
         // init ownership
         __Ownable_init();
@@ -86,11 +86,11 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         // check conditions
         IHedgehogFactory factory = IHedgehogFactory(owner());
         require(_poolType == 721, "!721");
-        require(factory.ifCoinEnabled(liquidationAsset), "liquidation asset not enabled");
+        require(factory.ifTokenSupported(marginToken), "margin token not supported");
 
         // check parameters
         nftAddr = _nftAddr;
-        liquidationAsset = _liquidationAsset;
+        marginToken = _marginToken;
     }
 
     function createOrder(
@@ -289,23 +289,23 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function _pullToken(address usr, uint amount) internal {
-        if (liquidationAsset == address(0)) {
+        if (marginToken == address(0)) {
             require(msg.value >= amount, "!margin");
         } else {
-            uint laOld = IERC20Upgradeable(liquidationAsset).balanceOf(address(this));
-            IERC20Upgradeable(liquidationAsset).safeTransferFrom(usr, address(this), amount);
-            uint laNew = IERC20Upgradeable(liquidationAsset).balanceOf(address(this));
+            uint laOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            IERC20Upgradeable(marginToken).safeTransferFrom(usr, address(this), amount);
+            uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
             require(laNew.sub(laOld) == amount, "!support taxed token");
         }
     }
 
     function _pushToken(address usr, uint amount) internal {
-        if (liquidationAsset == address(0)) {
+        if (marginToken == address(0)) {
             payable(usr).transfer(amount);
         } else {
-            uint laOld = IERC20Upgradeable(liquidationAsset).balanceOf(address(this));
-            IERC20Upgradeable(liquidationAsset).safeTransfer(usr, amount);
-            uint laNew = IERC20Upgradeable(liquidationAsset).balanceOf(address(this));
+            uint laOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            IERC20Upgradeable(marginToken).safeTransfer(usr, amount);
+            uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
             require(laOld.sub(laNew) == amount, "!support taxed token");
         }
     }
@@ -396,4 +396,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         (bool success, bytes memory resultData) = address(assetAddr).call(data);
         require(success, string(resultData));
     }
+
+    
+
 }
