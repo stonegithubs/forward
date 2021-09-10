@@ -108,7 +108,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
         address beaconProxyAddr;
         if (_poolType == 721) {
-            // Do not use Method 1 to prevent redundant contract deploy for same parameters
+            // Do not use Method 1 to prevent redundant contract deploy for same parameters, 
+            //     because it will always succeed with contract account's nonce increasing
             // Method 1: deploy new beacon proxy
             // address beaconProxyAddr = address(new BeaconProxy(address(this), ""));
 

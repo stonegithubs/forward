@@ -20,7 +20,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     address public liquidationAsset;
     uint public cfee;
 
-    enum OrderState { active, dead, fill, challenge, settle }
+    enum OrderState { active, dead, fill, challenge, unsettle, settle }
     //TODO: change maker/taker to buyer/seller
     struct Order {
         address buyer;
@@ -215,7 +215,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
      */
     function settle(uint256 orderId) external {
 
-        require(checkOrderState(orderId) == 6, "! force settle");
+        require(checkOrderState(orderId) == uint(OrderState.unsettle), "! force settle");
         _settle(orderId, true);
     }
 
@@ -265,19 +265,19 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             1: order is dead, 
             2: order is filled, 
             3: order is being challenged between maker and taker,
-            4: order has been successfully settled
-            5: not exist
-            6: challenge ended, yet not settled
+            4: challenge ended, yet not settled
+            5: order has been successfully settled
+            6: not exist
      */
     function checkOrderState(uint orderId) public view returns (uint) {
         Order memory order = orders[orderId];
-        if (order.validTill == 0 ) return 5;
+        if (order.validTill == 0 ) return 6;
         uint time = _getBlockTimestamp();
         if (time <= order.validTill) return uint(OrderState.active);
         if (order.buyer == address(0) || order.seller == address(0)) return uint(OrderState.dead);
         if (time <= order.deliveryTime) return uint(OrderState.fill);
         if (time <= order.challengeTime) return uint(OrderState.challenge);
-        if (order.state == OrderState.challenge) return 6;
+        if (order.state != OrderState.settle) return uint(OrderState.unsettle);
         return uint(OrderState.settle);
     }
 
@@ -311,12 +311,12 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function _multiDeposit721(uint256[] memory tokenIds) internal {
-        uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
+        // uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
         for (uint i = 0; i < tokenIds.length; i++) {
             _deposit721(tokenIds[i]);
         }
-        uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
-        require(newBal.sub(oldBal) == tokenIds.length, "redundant Ids");
+        // uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
+        // require(newBal.sub(oldBal) == tokenIds.length, "redundant Ids");
     }
 
     function _deposit721(uint256 tokenId) internal {
@@ -326,12 +326,12 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function _multiWithdraw721(uint256[] memory tokenIds, address to) internal {
-        uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
+        // uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
         for (uint i = 0; i < tokenIds.length; i++) {
             _withdraw721(tokenIds[i], to);
         }
-        uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
-        require(oldBal.sub(newBal) == tokenIds.length, "redundant Ids");
+        // uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
+        // require(oldBal.sub(newBal).div(10**) == tokenIds.length, "redundant Ids");
     }
 
     function _withdraw721(uint256 tokenId, address to) internal {
