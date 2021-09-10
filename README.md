@@ -1,3 +1,22 @@
+
+# Basic Sample Hardhat Project
+
+This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+
+Try running some of the following tasks:
+
+```shell
+npx hardhat accounts
+npx hardhat compile
+npx hardhat clean
+npx hardhat test
+npx hardhat node
+node scripts/sample-script.js
+npx hardhat help
+```
+
+
+
 1. 将20 721 1155分三类Forward合约，每种token对应一本Forward合约，如A_721 B_721将为两本Forward合约
 
 2. 因为对赌用户要质押保证金，所以每类合约的writer可以选择质押nft或不质押，

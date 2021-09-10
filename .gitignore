@@ -1,7 +1,8 @@
-/node_modules/
-/build/
-/deployments/
-*lock*
-*.py
-/deploy/*
-*secret*
+
+node_modules
+.env
+
+#Hardhat files
+cache
+artifacts
+package-lock.json
