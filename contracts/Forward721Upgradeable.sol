@@ -10,7 +10,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./interface/IHedgehogFactory.sol";
-
+import "./DummyWETH.sol";
+import "./interface/IWETH.sol";
 contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -19,6 +20,8 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     address public nftAddr;
     address public marginToken;
     uint public cfee;
+
+    IWETH public weth; 
 
     enum OrderState { active, dead, fill, challenge, unsettle, settle }
     //TODO: change maker/taker to buyer/seller
@@ -91,18 +94,20 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         // check parameters
         nftAddr = _nftAddr;
         marginToken = _marginToken;
+
+        weth = IWETH(DummyWETH.dummyWeth());
     }
 
     function createOrder(
         uint256[] memory tokenIds, 
-        uint orderValidPeriod, 
-        uint deliveryPrice, 
-        uint deliveryTime,
-        uint challengePeriod,
+        uint256 orderValidPeriod, 
+        uint256 deliveryPrice, 
+        uint256 deliveryTime,
+        uint256 challengePeriod,
         address[] memory takerWhiteList,
         bool deposit,
-        uint buyerMargin,
-        uint sellerMargin,
+        uint256 buyerMargin,
+        uint256 sellerMargin,
         bool isSeller
     ) external payable {
         address maker = msg.sender;
@@ -114,12 +119,14 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
 
         // check if maker wants to deposit tokens directly 
         if (deposit && !isSeller) {
-            _pullToken(msg.sender, buyerMargin);
+            (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
+            uint256 p = deliveryPrice.mul(fee.add(base)).div(base);
+            _pullToken(maker, p);
+        } else {
+            // take margin from maker normally
+            _pullToken(maker, isSeller ? sellerMargin : buyerMargin);
         }
 
-        // take margin from maker
-        uint makerMargin = isSeller ? sellerMargin : buyerMargin;
-        _pullToken(maker, makerMargin);
 
         // create order
         orders.push(
@@ -297,6 +304,8 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
             require(laNew.sub(laOld) == amount, "!support taxed token");
         }
+        // TODO: directly deposit token to our hedgehog forward vault
+        
     }
 
     function _pushToken(address usr, uint amount) internal {
