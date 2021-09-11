@@ -49,7 +49,6 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         bool sellerDelivery;
         bool buyerDelivery;
     }
-
     Order[] public orders;
 
     event CreateOrder(
@@ -184,12 +183,12 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function createOrder(
-        uint256[] calldata tokenIds, 
+        uint256[] memory tokenIds, 
         uint256 orderValidPeriod, 
         uint256 deliveryPrice, 
         uint256 deliveryTime,
         uint256 challengePeriod,
-        address[] calldata takerWhiteList,
+        address[] memory takerWhiteList,
         bool deposit,
         uint256 buyerMargin,
         uint256 sellerMargin,
@@ -205,10 +204,8 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         uint shares;
         if (deposit && !isSeller) {
             uint256 p;
-            {
-                (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
-                p = deliveryPrice.mul(fee.add(base)).div(base);
-            }
+            (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
+            p = deliveryPrice.mul(fee.add(base)).div(base);
             shares = _pullToken(msg.sender, p, true);
         } else {
             // take margin from msg.sender normally
@@ -445,12 +442,9 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function _multiDeposit721(uint256[] memory tokenIds) internal {
-        // uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
         for (uint i = 0; i < tokenIds.length; i++) {
             _deposit721(tokenIds[i]);
         }
-        // uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
-        // require(newBal.sub(oldBal) == tokenIds.length, "redundant Ids");
     }
 
     function _deposit721(uint256 tokenId) internal {
@@ -460,12 +454,9 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function _multiWithdraw721(uint256[] memory tokenIds, address to) internal {
-        // uint oldBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
         for (uint i = 0; i < tokenIds.length; i++) {
             _withdraw721(tokenIds[i], to);
         }
-        // uint newBal = IERC721Upgradeable(nftAddr).balanceOf(address(this));
-        // require(oldBal.sub(newBal).div(10**) == tokenIds.length, "redundant Ids");
     }
 
     function _withdraw721(uint256 tokenId, address to) internal {

@@ -22,7 +22,7 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
 
     address public governance;
     
-    constructor() public {
+    constructor() {
         governance = address(0xdead);
     }
 

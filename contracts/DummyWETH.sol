@@ -40,7 +40,7 @@ library DummyWETH {
         }
     }
 
-    function dummyEth() internal view returns (address) {
+    function dummyEth() internal pure returns (address) {
         return address(0);
     }
     
