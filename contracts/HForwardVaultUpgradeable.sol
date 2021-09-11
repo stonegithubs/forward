@@ -21,6 +21,10 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
     uint256 public constant max = 10000;
 
     address public governance;
+    
+    constructor() public {
+        governance = address(0xdead);
+    }
 
     function __HForwardVault_init(
         address _want,
@@ -28,7 +32,7 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
         address _governance,
         uint256 _min,
         uint256 _tolerance
-    ) internal initializer {
+    ) public initializer {
         __ERC20_init(
             string(abi.encodePacked("hedgehog forward vault ", ERC20Upgradeable(_want).name())),
             string(abi.encodePacked("hfv ", ERC20Upgradeable(_want).symbol()))
@@ -87,7 +91,7 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
         }
     }
 
-    function deposit(uint256 _amount) public {
+    function deposit(uint256 _amount) public returns (uint256) {
         uint256 _pool = balance();
         uint256 _before = want.balanceOf(address(this));
         want.safeTransferFrom(msg.sender, address(this), _amount);
@@ -100,14 +104,15 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
             shares = (_amount.mul(totalSupply())).div(_pool);
         }
         _mint(msg.sender, shares);
+        return shares;
     }
 
-    function depositAll() external {
-        deposit(want.balanceOf(msg.sender));
+    function depositAll() external returns (uint256) {
+        return deposit(want.balanceOf(msg.sender));
     }
     
 
-    function withdraw(uint256 _shares) public {
+    function withdraw(uint256 _shares) public returns (uint256) {
         uint256 r = (balance().mul(_shares)).div(totalSupply());
         _burn(msg.sender, _shares);
 
@@ -125,10 +130,11 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
         }
 
         want.safeTransfer(msg.sender, r);
+        return r;
     }
 
-    function withdrawAll() external {
-        withdraw(balanceOf(msg.sender));
+    function withdrawAll() external returns (uint256) {
+        return withdraw(balanceOf(msg.sender));
     }
 
     function getPricePerFullShare() public view returns (uint256) {

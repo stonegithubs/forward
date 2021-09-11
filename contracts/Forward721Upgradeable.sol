@@ -12,6 +12,8 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./interface/IHedgehogFactory.sol";
 import "./DummyWETH.sol";
 import "./interface/IWETH.sol";
+import "./interface/IHForwardVault.sol";
+
 contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -21,15 +23,19 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     address public marginToken;
     uint public cfee;
 
-    IWETH public weth; 
+    address public forwardVault;
+    address public eth; 
+    address public weth; 
+    uint256 public ratio;
 
     enum OrderState { active, dead, fill, challenge, unsettle, settle }
-    //TODO: change maker/taker to buyer/seller
     struct Order {
         address buyer;
         uint buyerMargin;
+        uint buyerShare;
         address seller;
         uint sellerMargin;
+        uint sellerShare;
 
         uint256[] tokenIds;
         uint validTill;
@@ -95,46 +101,130 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         nftAddr = _nftAddr;
         marginToken = _marginToken;
 
-        weth = IWETH(DummyWETH.dummyWeth());
+        weth = DummyWETH.dummyWeth();
+        eth = DummyWETH.dummyEth();
+        
+        ratio = 1e18;
+    }
+    
+    function setForwardVault(address _forwardVault) external onlyOwner {
+
+
+
+        if (forwardVault == address(0) && _forwardVault != address(0)) {
+            
+            // enable vault first time
+            address want = IHForwardVault(_forwardVault).want();
+            require(want == marginToken || want == weth, "!want");
+            // approve margin tokens for new forward vault
+            IERC20Upgradeable(want).safeApprove(_forwardVault, 0);
+            IERC20Upgradeable(want).safeApprove(_forwardVault, type(uint256).max);
+
+        } else if (forwardVault != address(0) && _forwardVault != address(0)) {
+            
+            // change vault from one to another one
+            address want = IHForwardVault(_forwardVault).want();
+
+            uint256 oldShares = IHForwardVault(forwardVault).balanceOf(address(this));
+            uint256 tokens = oldShares > 0 ? IHForwardVault(forwardVault).withdraw(oldShares) : 0;
+            if (marginToken == eth) {
+                uint _weth = IWETH(weth).balanceOf(address(this));
+                if (_weth > 0) {
+                    IWETH(weth).withdraw(_weth);
+                }
+            }
+            IERC20Upgradeable(want).safeApprove(forwardVault, 0);
+            ratio = oldShares > 0 ? tokens.mul(1e18).div(oldShares) : ratio;
+
+            require(want == marginToken || want == weth, "!want");
+            IERC20Upgradeable(want).safeApprove(_forwardVault, 0);
+            IERC20Upgradeable(want).safeApprove(_forwardVault, type(uint256).max);
+
+
+        } else if (forwardVault != address(0) && _forwardVault == address(0)) {
+            
+            // disable vault finally
+            uint256 oldShares = IHForwardVault(forwardVault).balanceOf(address(this));
+            uint256 tokens = oldShares > 0 ? IHForwardVault(forwardVault).withdraw(oldShares) : 0;
+            if (marginToken == eth) {
+                uint _weth = IWETH(weth).balanceOf(address(this));
+                if (_weth > 0) {
+                    IWETH(weth).withdraw(_weth);
+                }
+            }
+            // close approval
+            IERC20Upgradeable(IHForwardVault(forwardVault).want()).safeApprove(forwardVault, 0);
+            // remember the ratio
+            ratio = oldShares > 0 ? tokens.mul(1e18).div(oldShares) : ratio;
+
+        }
+
+        forwardVault = _forwardVault;
+
+    }
+
+    function balance() public view returns (uint256) {
+        return available().add(balanceSavingsInHVault());
+    }
+
+    function available() public view returns (uint256) {
+        return marginToken == address(0) ? address(this).balance : IERC20Upgradeable(marginToken).balanceOf(address(this));
+    }
+    
+    function balanceSavingsInHVault() public view returns (uint256) {
+        return forwardVault == address(0) ? 0 : IHForwardVault(forwardVault).balanceOf(address(this)).mul(
+                                                    IHForwardVault(forwardVault).getPricePerFullShare()
+                                                ).div(1e18);
+    }
+
+    function getPricePerFullShare() public view returns (uint256) {
+        return forwardVault == address(0) ? 
+            ratio : 
+            ratio.mul(IHForwardVault(forwardVault).getPricePerFullShare()).div(1e18);
     }
 
     function createOrder(
-        uint256[] memory tokenIds, 
+        uint256[] calldata tokenIds, 
         uint256 orderValidPeriod, 
         uint256 deliveryPrice, 
         uint256 deliveryTime,
         uint256 challengePeriod,
-        address[] memory takerWhiteList,
+        address[] calldata takerWhiteList,
         bool deposit,
         uint256 buyerMargin,
         uint256 sellerMargin,
         bool isSeller
     ) external payable {
-        address maker = msg.sender;
 
-        // check if maker wants to deposit tokenId nft directly
+        // check if msg.sender wants to deposit tokenId nft directly
         if (deposit && isSeller) {
             _multiDeposit721(tokenIds);
         }
 
-        // check if maker wants to deposit tokens directly 
+        // check if msg.sender wants to deposit tokens directly 
+        uint shares;
         if (deposit && !isSeller) {
-            (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
-            uint256 p = deliveryPrice.mul(fee.add(base)).div(base);
-            _pullToken(maker, p);
+            uint256 p;
+            {
+                (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
+                p = deliveryPrice.mul(fee.add(base)).div(base);
+            }
+            shares = _pullToken(msg.sender, p, true);
         } else {
-            // take margin from maker normally
-            _pullToken(maker, isSeller ? sellerMargin : buyerMargin);
+            // take margin from msg.sender normally
+            shares = _pullToken(msg.sender, isSeller ? sellerMargin : buyerMargin, true);
         }
 
 
         // create order
         orders.push(
             Order({
-                buyer: isSeller ? address(0) : maker,
+                buyer: isSeller ? address(0) : msg.sender,
                 buyerMargin: buyerMargin,
-                seller: isSeller ? maker : address(0),
+                buyerShare: isSeller ? 0 : shares,
+                seller: isSeller ? msg.sender : address(0),
                 sellerMargin: sellerMargin,
+                sellerShare: isSeller ? shares : 0,
                 tokenIds: new uint256[](0),
                 validTill: _getBlockTimestamp() + orderValidPeriod,
                 deliveryPrice: deliveryPrice,
@@ -158,7 +248,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             }
         }
         
-        emit CreateOrder(orders.length - 1, maker, tokenIds, orders[curOrderIndex].validTill, orders[curOrderIndex].deliveryPrice, orders[curOrderIndex].deliveryTime, orders[curOrderIndex].challengeTime, takerWhiteList, isSeller);
+        emit CreateOrder(orders.length - 1, msg.sender, tokenIds, orders[curOrderIndex].validTill, orders[curOrderIndex].deliveryPrice, orders[curOrderIndex].deliveryTime, orders[curOrderIndex].challengeTime, takerWhiteList, isSeller);
     }
 
 
@@ -174,13 +264,15 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         }
 
         uint takerMargin = orders[orderId].seller == address(0) ? orders[orderId].sellerMargin : orders[orderId].buyerMargin;
-        _pullToken(taker, takerMargin);
+        uint shares = _pullToken(taker, takerMargin, true);
 
         // change storage
         if (orders[orderId].buyer == address(0)) {
             orders[orderId].buyer = taker;
+            orders[orderId].buyerShare = shares;
         } else {
             orders[orderId].seller = taker;
+            orders[orderId].sellerShare = shares;
         }
         orders[orderId].state = OrderState.fill;
         emit TakeOrder(orderId, taker, takerMargin);
@@ -207,7 +299,14 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             // buyer tends to deliver tokens
             (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            _pullToken(sender, buyerAmount.sub(order.buyerMargin));
+            _pullToken(
+                sender, 
+                // TODO: check carefully calculate the remaining debt of buyer
+                buyerAmount.sub(
+                    forwardVault == address(0) ? order.buyerMargin :
+                    order.buyerShare.mul(getPricePerFullShare()).div(1e18)
+                ), 
+                false);
             orders[orderId].buyerDelivery = true;
             emit Delivery(orderId, sender);
         }
@@ -237,7 +336,10 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             // no margin for buyer
             uint bfee = order.deliveryPrice.mul(fee).div(base);
             // send seller payout
-            uint sellerAmount = order.sellerMargin.add(order.deliveryPrice).sub(bfee);
+            // uint sellerAmount = order.sellerMargin.add(order.deliveryPrice).sub(bfee);
+            uint sellerAmount = forwardVault == address(0) ?  
+                                    order.sellerMargin.add(order.deliveryPrice).sub(bfee) :
+                                    order.sellerShare.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
             _pushToken(order.seller, sellerAmount);
             cfee = cfee.add(bfee.mul(2));
 
@@ -250,12 +352,20 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
                 // blame seller if he/she does not deliver nfts  
                 uint sfee = order.sellerMargin.mul(fee).div(base);
                 cfee = cfee.add(sfee);
-                _pushToken(order.buyer, order.sellerMargin.sub(sfee));
+                _pushToken(
+                    order.buyer, 
+                    forwardVault == address(0) ? order.sellerMargin.sub(sfee) : 
+                        order.sellerShare.mul(getPricePerFullShare()).div(1e18).sub(sfee)
+                );
             } else {
                 // blame buyer
                 uint bfee = order.buyerMargin.mul(fee).div(base);
                 cfee = cfee.add(bfee);
-                _pushToken(order.seller, order.buyerMargin.sub(bfee));
+                _pushToken(
+                    order.seller,
+                    forwardVault == address(0) ? order.buyerMargin.sub(bfee) : 
+                        order.buyerShare.mul(getPricePerFullShare()).div(1e18).sub(bfee)
+                );
 
             }
             orders[orderId].state = OrderState.settle;
@@ -291,31 +401,46 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     function collectFee() external {
         address feeCollector = IHedgehogFactory(owner()).feeCollector();
         require(feeCollector != address(0), "!feeCollector");
-        _pullToken(feeCollector, cfee);
+        _pushToken(feeCollector, cfee);
         cfee = 0;
     }
 
-    function _pullToken(address usr, uint amount) internal {
-        if (marginToken == address(0)) {
-            require(msg.value >= amount, "!margin");
+    function _pullToken(address usr, uint amount, bool farm) internal returns (uint256 shares) {
+        if (marginToken == eth) {
+            require(msg.value >= amount, "!margin"); // don't send more ether, won't payback
+            // if vault exists, chagne ether to weth 
+            if (forwardVault != address(0)) {
+                IWETH(weth).deposit{value: msg.value}();
+            }
         } else {
-            uint laOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            uint rbOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
             IERC20Upgradeable(marginToken).safeTransferFrom(usr, address(this), amount);
-            uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
-            require(laNew.sub(laOld) == amount, "!support taxed token");
+            uint rbNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            require(rbNew.sub(rbOld) == amount, "!support taxed token");
         }
-        // TODO: directly deposit token to our hedgehog forward vault
+
+        shares = forwardVault == address(0) && farm ? amount : IHForwardVault(forwardVault).deposit(amount);
         
     }
 
     function _pushToken(address usr, uint amount) internal {
-        if (marginToken == address(0)) {
+        // check if balance not enough, if not, withdraw from vault
+        uint ava = available();
+        if (ava < amount && forwardVault != address(0)) {
+            IHForwardVault(forwardVault).withdraw(amount.sub(ava));
+        }
+
+        amount = marginToken == eth ? IWETH(weth).balanceOf(address(this)).add(available()) : available();
+        
+        if (marginToken == eth) {
+            IWETH(weth).withdraw(IWETH(weth).balanceOf(address(this)));
             payable(usr).transfer(amount);
+
         } else {
-            uint laOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            // uint laOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
             IERC20Upgradeable(marginToken).safeTransfer(usr, amount);
-            uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
-            require(laOld.sub(laNew) == amount, "!support taxed token");
+            // uint laNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
+            // require(laOld.sub(laNew) == amount, "!support taxed token");
         }
     }
 

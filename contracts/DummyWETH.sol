@@ -38,7 +38,10 @@ library DummyWETH {
         } else {
             revert("dummyWeth not supported");
         }
-        
+    }
+
+    function dummyEth() internal view returns (address) {
+        return address(0);
     }
     
 }

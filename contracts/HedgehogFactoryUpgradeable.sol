@@ -85,6 +85,9 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         feeCollector = _feeCollector;
     }
 
+    function setForwardVault(uint256 _poolId, address _forwardVault) external onlyOwner {
+        Forward721Upgradeable(allPairs[_poolId]).setForwardVault(_forwardVault);
+    }
 
     function ifTokenSupported(address _token) public view override returns (bool) {
         return _token == address(0) || supportedTokens[_token] > 0;
@@ -125,8 +128,11 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
         getPair[_nftAddr][_marginToken] = beaconProxyAddr;
         getPair[_marginToken][_nftAddr] = beaconProxyAddr;
+        allPairs.push(beaconProxyAddr);
 
         emit PoolCreated(_nftAddr, _poolType, beaconProxyAddr, allPairs.length);
     }
+    
+    
     
 }
