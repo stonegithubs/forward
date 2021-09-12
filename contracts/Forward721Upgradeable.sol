@@ -78,7 +78,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     );
 
     constructor() {
-        transferOwnership(address(0xdead));
+        // transferOwnership(address(0xdead));
 
     }
 
@@ -550,6 +550,8 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         require(success, string(resultData));
     }
 
-    
+    function version() external virtual view returns (string memory) {
+        return "v1.0";
+    }
 
 }

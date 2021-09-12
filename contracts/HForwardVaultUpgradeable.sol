@@ -140,5 +140,9 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
     function getPricePerFullShare() public view returns (uint256) {
         return balance().mul(1e18).div(totalSupply());
     }
+
+    function version() external virtual view returns (string memory) {
+        return "v1.0";
+    }
 }
 

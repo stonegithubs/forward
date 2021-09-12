@@ -30,7 +30,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
     constructor()
     {
-        transferOwnership(address(0xdead));
+        // transferOwnership(address(0xdead));
     }
 
     function initialize(
@@ -133,6 +133,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         emit PoolCreated(_nftAddr, _poolType, beaconProxyAddr, allPairs.length);
     }
     
-    
+    function version() external virtual override view returns (string memory) {
+        return "v1.0";
+    }
     
 }

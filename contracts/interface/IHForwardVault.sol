@@ -20,4 +20,7 @@ interface IHForwardVault is IERC20Upgradeable {
     function want() external view returns (address);
     function yVault() external view returns (address);
     function governance() external view returns (address);
+    
+    function version() external returns (string memory);
+
 }
