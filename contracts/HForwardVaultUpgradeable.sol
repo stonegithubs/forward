@@ -22,9 +22,7 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
 
     address public governance;
     
-    constructor() {
-        governance = address(0xdead);
-    }
+    constructor() {}
 
     function __HForwardVault_init(
         address _want,
@@ -138,7 +136,8 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
     }
 
     function getPricePerFullShare() public view returns (uint256) {
-        return balance().mul(1e18).div(totalSupply());
+        uint supply = totalSupply();
+        return supply == 0 ? 1e18 : balance().mul(1e18).div(supply);
     }
 
     function version() external virtual view returns (string memory) {

@@ -77,10 +77,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         uint orderId
     );
 
-    constructor() {
-        // transferOwnership(address(0xdead));
-
-    }
+    constructor() {}
 
     function initialize(
         address _nftAddr,
@@ -94,7 +91,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         // check conditions
         IHedgehogFactory factory = IHedgehogFactory(owner());
         require(_poolType == 721, "!721");
-        require(factory.ifTokenSupported(marginToken), "margin token not supported");
+        require(factory.ifTokenSupported(_marginToken), "margin token not supported");
 
         // check parameters
         nftAddr = _nftAddr;

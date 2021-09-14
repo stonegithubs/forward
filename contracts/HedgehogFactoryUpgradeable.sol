@@ -28,10 +28,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         uint index
     );
 
-    constructor()
-    {
-        // transferOwnership(address(0xdead));
-    }
+    constructor(){}
 
     function initialize(
         address _forward721Imp,

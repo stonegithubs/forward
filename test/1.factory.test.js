@@ -1,6 +1,6 @@
 const { ethers, upgrades } = require("hardhat");
 const { expect } = require('chai');
-const utils = require('../scripts/utils')
+const { BN, constants, expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 
 let owner, alice, bob, carl;
 
@@ -8,17 +8,17 @@ let factory;
 
 
 describe("Factory", function () {
-    before("deploy", async() => {
-        const config = utils.getConfig();
-        this.dai = config.ropsten.dai.address;
-
+    before("deploy", async() => {        
         signers = await ethers.getSigners();
         owner = signers[0];
         alice = signers[1];
         bob = signers[2];
         feeCollector = signers[3];
 
-
+        const chainId = (await signers[0].getChainId()).toString()
+        console.log("chainId: ", chainId)
+        this.dai = alice.address;
+        
         const Forward721Imp = await ethers.getContractFactory(
             "Forward721Upgradeable"
         );
@@ -42,11 +42,11 @@ describe("Factory", function () {
 
     it("Should setFee correctly", async() => {
         await factory.connect(owner).setFee(10);
-        expect(await factory.fee()).to.equal(10);
+        expect((await factory.fee()).toString()).to.equal("10");
         expect(await factory.ifTokenSupported(this.dai)).to.eq(true);
     })
     it("Should supportToken and disableToken correctly", async() => {
-        expect(await factory.fee()).to.equal(10);
+        expect((await factory.fee()).toString()).to.equal("10");
         expect(await factory.ifTokenSupported(bob.address)).to.eq(false);
         await factory.connect(owner).supportToken(bob.address);
         expect(await factory.ifTokenSupported(bob.address)).to.eq(true);
@@ -59,19 +59,32 @@ describe("Factory", function () {
         const TestFactoryUpgrade = await ethers.getContractFactory(
             "TestFactoryUpgrade"
         );
-        const testFactoryUpgrade = await TestFactoryUpgrade.deploy();
-        await testFactoryUpgrade.deployed();
-        console.log("factory v1.1 impl addr: ", testFactoryUpgrade.address)
 
         const upgraded = await upgrades.upgradeProxy(
             factory.address,
             TestFactoryUpgrade
         );
         expect(await upgraded.version()).to.equal("v1.1")
-        expect(await factory.fee()).to.equal(10);
+        expect((await factory.fee()).toString()).to.equal("10");
         expect(await factory.version()).to.equal("v1.1")
     })
-   
+    
+    it("Should deploy pool correctly", async() => {
+        expect((await factory.allPairsLength()).toString()).to.equal("0");
+        await factory.connect(alice).deployPool(
+            alice.address,
+            721,
+            this.dai
+        );
+        expect((await factory.allPairsLength()).toString()).to.equal("1");
+        await expectRevert(factory.connect(alice).deployPool(
+            alice.address,
+            721,
+            this.dai
+            ), 'pool exist',
+        );
+        expect((await factory.allPairsLength()).toString()).to.equal("1");
+    })
     
     
 })

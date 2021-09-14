@@ -36,7 +36,8 @@ library DummyWETH {
         } else if (chainId == 62    /* etc morden testnet */) {
             return address(0);
         } else {
-            revert("dummyWeth not supported");
+            // revert("dummyWeth not supported");
+            return address(0xdead);
         }
     }
 

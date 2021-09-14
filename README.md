@@ -16,7 +16,6 @@ npx hardhat help
 ```
 
 
-
 1. 将20 721 1155分三类Forward合约，每种token对应一本Forward合约，如A_721 B_721将为两本Forward合约
 
 2. 因为对赌用户要质押保证金，所以每类合约的writer可以选择质押nft或不质押，

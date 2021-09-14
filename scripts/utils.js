@@ -7,7 +7,7 @@ function getConfig() {
     )
 }
 
-function writeConfig(contractAddresses) {
+function saveConfig(contractAddresses) {
     fs.writeFileSync(
         `${process.cwd()}/config/config.json`,
         JSON.stringify(contractAddresses, null, 4) // Indent 4 spaces
@@ -16,5 +16,5 @@ function writeConfig(contractAddresses) {
 
 module.exports = {
     getConfig,
-    writeConfig
+    saveConfig
 }
