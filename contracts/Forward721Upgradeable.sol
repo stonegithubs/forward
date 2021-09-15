@@ -28,7 +28,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     address public weth; 
     uint256 public ratio;
 
-    enum OrderState { active, dead, fill, challenge, unsettle, settle }
+    enum OrderState { inactive, active, dead, fill, challenge, unsettle, settle }
     struct Order {
         address buyer;
         uint buyerMargin;
@@ -187,7 +187,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         uint256[] memory _tokenIds, 
         uint256 _orderValidPeriod, 
         uint256 _deliveryPrice, 
-        uint256 _deliveryTime,
+        uint256 _deliveryPeriod,
         uint256 _challengePeriod,
         address[] memory _takerWhiteList,
         uint256 _buyerMargin,
@@ -215,25 +215,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
 
 
         // create order
-        orders.push(
-            Order({
-                buyer: _isSeller ? address(0) : msg.sender,
-                buyerMargin: _buyerMargin,
-                buyerShare: _isSeller ? 0 : shares,
-                seller: _isSeller ? msg.sender : address(0),
-                sellerMargin: _sellerMargin,
-                sellerShare: _isSeller ? shares : 0,
-                tokenIds: new uint256[](0),
-                validTill: _getBlockTimestamp() + _orderValidPeriod,
-                deliveryPrice: _deliveryPrice,
-                deliveryTime: _deliveryTime,
-                challengeTime: _deliveryTime + _challengePeriod,
-                takerWhiteList: new address[](0),
-                state: OrderState.active,
-                sellerDelivery: _deposit && _isSeller,
-                buyerDelivery: _deposit && !_isSeller
-            })
-        );
+        _pushOrder(_orderValidPeriod, _deliveryPrice, _deliveryPeriod, _challengePeriod, _buyerMargin, _sellerMargin, _deposit, _isSeller, shares);
         
         uint curOrderIndex = orders.length - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
@@ -259,6 +241,40 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         );
     }
 
+    function _pushOrder(
+        uint256 _orderValidPeriod, 
+        uint256 _deliveryPrice, 
+        uint256 _deliveryPeriod,
+        uint256 _challengePeriod,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
+        bool _deposit,
+        bool _isSeller, 
+        uint shares
+    ) internal {
+        uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
+        uint deliveryTime = validTill.add(_deliveryPeriod);
+        uint challengeTime = deliveryTime.add(_challengePeriod);
+        orders.push(
+            Order({
+                buyer: _isSeller ? address(0) : msg.sender,
+                buyerMargin: _buyerMargin,
+                buyerShare: _isSeller ? 0 : shares,
+                seller: _isSeller ? msg.sender : address(0),
+                sellerMargin: _sellerMargin,
+                sellerShare: _isSeller ? shares : 0,
+                tokenIds: new uint256[](0),
+                validTill: validTill,
+                deliveryPrice: _deliveryPrice,
+                deliveryTime: deliveryTime,
+                challengeTime: challengeTime,
+                takerWhiteList: new address[](0),
+                state: OrderState.active,
+                sellerDelivery: _deposit && _isSeller,
+                buyerDelivery: _deposit && !_isSeller
+            })
+        );
+    }
 
     function takeOrder(uint _orderId) external payable {
         address taker = msg.sender;
@@ -295,7 +311,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     
     function deliver(uint256 _orderId) external payable {
         Order memory order = orders[_orderId];
-        require(checkOrderState(_orderId) == uint(OrderState.challenge), "!challenge");
+        require(checkOrderState(_orderId) == OrderState.challenge, "!challenge");
         address sender = msg.sender;
         require(sender == order.seller || sender == order.buyer, "only seller & buyer");
 
@@ -333,7 +349,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
      */
     function settle(uint256 _orderId) external {
 
-        require(checkOrderState(_orderId) == uint(OrderState.unsettle), "!unsettle");
+        require(checkOrderState(_orderId) == OrderState.unsettle, "!unsettle");
         // challenge time has past, anyone can forcely settle this order 
         _settle(_orderId, true);
     }
@@ -396,24 +412,28 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
      * @dev return order state based on orderId
      * @param _orderId order index whose state to be checked.
      * @return 
-            0: active, 
-            1: order is dead, 
-            2: order is filled, 
-            3: order is being challenged between maker and taker,
-            4: challenge ended, yet not settled
-            5: order has been successfully settled
-            6: not exist
+            0: inactive, or not exist
+            1: active, 
+            2: order is dead, 
+            3: order is filled, 
+            4: order is being challenged between maker and taker,
+            5: challenge ended, yet not settled
+            6: order has been successfully settled
      */
-    function checkOrderState(uint _orderId) public view returns (uint) {
+    function checkOrderState(uint _orderId) public view returns (OrderState) {
         Order memory order = orders[_orderId];
-        if (order.validTill == 0 ) return 6;
+        if (order.validTill == 0 ) return OrderState.inactive;
         uint time = _getBlockTimestamp();
-        if (time <= order.validTill) return uint(OrderState.active);
-        if (order.buyer == address(0) || order.seller == address(0)) return uint(OrderState.dead);
-        if (time <= order.deliveryTime) return uint(OrderState.fill);
-        if (time <= order.challengeTime) return uint(OrderState.challenge);
-        if (order.state != OrderState.settle) return uint(OrderState.unsettle);
-        return uint(OrderState.settle);
+        if (time <= order.validTill) return OrderState.active;
+        if (order.buyer == address(0) || order.seller == address(0)) return OrderState.dead;
+        if (time <= order.deliveryTime) return OrderState.fill;
+        if (time <= order.challengeTime) return OrderState.challenge;
+        if (order.state != OrderState.settle) return OrderState.unsettle;
+        return OrderState.settle;
+    }
+
+    function ordersLength() external view returns (uint) {
+        return orders.length;
     }
 
     function collectFee(address _to) external {

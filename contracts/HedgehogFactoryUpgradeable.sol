@@ -96,7 +96,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
     function allPairsLength() external view returns (uint) {
         return allPairs.length;
-    } 
+    }
 
     function deployPool(
         address _nftAddr,
