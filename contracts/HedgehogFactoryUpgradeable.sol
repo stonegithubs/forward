@@ -21,6 +21,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
+    address public poolDeployer;
+
     event PoolCreated(
         address indexed nftAddr,
         uint poolType,
@@ -38,6 +40,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     ) public initializer {
         __UpgradeableBeacon__init(_forward721Imp);
 
+        poolDeployer = owner();
 
         enabledTokens.push(address(0));
         for (uint i = 0; i < _marginTokens.length; i++) {
@@ -103,6 +106,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         uint _poolType,
         address _marginToken
     ) external {
+        require(poolDeployer == address(0) || msg.sender == poolDeployer, "!poolDeployer");
         require(getPair[_nftAddr][_marginToken] == address(0), "pool exist"); // single check is sufficient
 
         address beaconProxyAddr;
@@ -130,6 +134,11 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         emit PoolCreated(_nftAddr, _poolType, beaconProxyAddr, allPairs.length);
     }
     
+    function setPoolDeployer(address _deployer) external onlyOwner {
+        require(owner() == address(0) || msg.sender == owner() || msg.sender == poolDeployer, "!auth");
+        poolDeployer = _deployer;
+    }
+
     function version() external virtual override view returns (string memory) {
         return "v1.0";
     }
