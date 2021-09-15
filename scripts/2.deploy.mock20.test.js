@@ -15,31 +15,42 @@ async function main() {
     if (
         network.name == "local"         /*local node*/
         || network.name == 'ropsten'    /*ropsten testnet */
+        || network.name == "rinkeby"
         ) {
         
-        // console.log("Deploying account:", await deployer.getAddress());
-        // console.log(
-        //     "Deploying account balance:",
-        //     (await deployer.getBalance()).toString(),
-        //     "\n"
-        // );
+        console.log("Deploying account:", await deployer.getAddress());
+        console.log(
+            "Deploying account balance:",
+            (await deployer.getBalance()).toString(),
+            "\n"
+        );
         
-        // // We get the contract to deploy
-        // const MockERC20 = await ethers.getContractFactory(
-        //     "MockERC20"
-        // );
-        // const mockErc20 = await MockERC20.deploy(args.mockerc20[0], args.mockerc20[1], args.mockerc20[2]);
-        // await mockErc20.deployed();        
-        // console.log("MockERC20: ", mockErc20.address);
-        // config[network.name].deployed.mockErc20 = mockErc20.address;
-        // utils.saveConfig(config);
-
-        await run("verify:verify", {
-            address: config[network.name].deployed.mockErc20,
-            contract: "contracts/test/MockERC20.sol:MockERC20",
-            constructorArguments: args.mockerc20,
-            network: network.name,
-          });
+        // We get the contract to deploy
+        const MockERC20 = await ethers.getContractFactory(
+            "MockERC20"
+        );
+        const mockErc20 = await MockERC20.deploy(args.mockerc20[0], args.mockerc20[1], args.mockerc20[2]);
+        await mockErc20.deployed();        
+        console.log("MockERC20: ", mockErc20.address);
+        config[network.name].deployed.mockErc20 = mockErc20.address;
+        utils.saveConfig(config);
+        
+        if (network.name != "local") {
+            try {
+                await run("verify:verify", {
+                    address: config[network.name].deployed.mockErc20,
+                    contract: "contracts/test/MockERC20.sol:MockERC20",
+                    constructorArguments: args.mockerc20,
+                    network: network.name,
+                  });
+              } catch (e) {
+                console.error(
+                  `verifying on ${network.name} taking too long...\ncall this in a minute or two:\n`,
+                  `hardhat verify --constructor-args scripts\arguments.js ${config[network.name].deployed.mockErc20} --network ${network.name}`
+                );
+              }
+        }
+        
 
     } else {
         throw("not deployed due to wrong network")

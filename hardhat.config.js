@@ -62,7 +62,10 @@ module.exports = {
       url: `https://ropsten.infura.io/v3/${config.ropsten.infuraKey}`,
       accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
     },
-
+    rinkeby: {
+      url: `https://rinkeby.infura.io/v3/${config.ropsten.infuraKey}`,
+      accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
+    },
     // mainnet: {
     //   url: `https://eth-mainnet.alchemyapi.io/v2/${config.ropsten.alchemyApiKey}`,
     //   accounts: [`0x${process.env.DEV_PRIVATE_KEY}`],
