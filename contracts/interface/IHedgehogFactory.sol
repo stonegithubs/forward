@@ -10,5 +10,6 @@ interface IHedgehogFactory is IBeacon {
     function ifTokenSupported(address coin) external view returns (bool);
     function getOperationFee() external view returns (uint fee, uint base);
     function feeCollector() external view returns (address);
+    function weth() external view returns (address);
     function version() external returns (string memory);
 }

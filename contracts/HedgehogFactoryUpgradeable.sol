@@ -22,6 +22,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     address[] public allPairs;
 
     address public poolDeployer;
+    address public override weth;
 
     event PoolCreated(
         address indexed nftAddr,
@@ -32,11 +33,12 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
     constructor(){}
 
-    function initialize(
+    function __FactoryUpgradeable__init(
         address _forward721Imp,
         address[] memory _marginTokens, 
         address _feeCollector,
-        uint _fee
+        uint _fee, 
+        address _weth
     ) public initializer {
         __UpgradeableBeacon__init(_forward721Imp);
 
@@ -51,6 +53,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         feeCollector = _feeCollector;
         require(_fee >= 0 && _fee < Base, "!fee");
         fee = _fee;
+        weth = _weth;
     }
 
     function supportToken(address _token) external onlyOwner {
@@ -137,6 +140,31 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
     function setPoolDeployer(address _deployer) external onlyOwner {
         require(owner() == address(0) || msg.sender == owner() || msg.sender == poolDeployer, "!auth");
         poolDeployer = _deployer;
+    }
+
+    function pausePools(uint256[] memory _poolIds) external onlyOwner {
+        for (uint i = 0; i < _poolIds.length; i++) {
+            Forward721Upgradeable(allPairs[_poolIds[i]]).pause();
+        }
+    }
+
+    function unpausePools(uint256[] memory _poolIds) external onlyOwner {
+        for (uint i = 0; i < _poolIds.length; i++) {
+            Forward721Upgradeable(allPairs[_poolIds[i]]).unpause();
+        }
+    }
+
+    function collectFee(address _to, uint256[] memory _poolIds) external onlyOwner {
+        for(uint i = 0; i < _poolIds.length; i++) {
+            Forward721Upgradeable(allPairs[_poolIds[i]]).collectFee(_to);
+        }
+    }
+    
+    function withdrawOther(uint _poolId, address _asset, address _to) external virtual {
+        require(msg.sender == owner() || owner() == address(0), "!auth");
+        Forward721Upgradeable(allPairs[_poolId]).withdrawOther(_asset, _to);
+
+        
     }
 
     function version() external virtual override view returns (string memory) {

@@ -27,6 +27,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     address public eth; 
     address public weth; 
     uint256 public ratio;
+    bool public paused;
 
     enum OrderState { inactive, active, dead, fill, challenge, unsettle, settle }
     struct Order {
@@ -97,16 +98,13 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         nftAddr = _nftAddr;
         marginToken = _marginToken;
 
-        weth = DummyWETH.dummyWeth();
-        eth = DummyWETH.dummyEth();
+        weth = factory.weth();
+        eth = address(0);
         
         ratio = 1e18;
     }
     
     function setForwardVault(address _forwardVault) external onlyOwner {
-
-
-
         if (forwardVault == address(0) && _forwardVault != address(0)) {
             
             // enable vault first time
@@ -162,6 +160,14 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         forwardVault = _forwardVault;
 
     }
+    
+    function pause() external onlyOwner {
+        paused = true;
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+    }
 
     function balance() public view returns (uint256) {
         return available().add(balanceSavingsInHVault());
@@ -195,7 +201,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         bool _deposit,
         bool _isSeller
     ) external payable {
-
+        require(!paused, "paused");
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
             _multiDeposit721(_tokenIds);
@@ -277,6 +283,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     }
 
     function takeOrder(uint _orderId) external payable {
+        require(!paused, "paused");
         address taker = msg.sender;
         // check condition
         require(_orderId < orders.length, "!orderId");
@@ -310,6 +317,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
      */
     
     function deliver(uint256 _orderId) external payable {
+        require(!paused, "paused");
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.challenge, "!challenge");
         address sender = msg.sender;
@@ -327,9 +335,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
             _pullToken(
                 sender, 
-                // TODO: check carefully calculate the remaining debt of buyer
                 buyerAmount.sub(
-                    // forwardVault == address(0) ? order.buyerMargin : /* we will not use buyerMargin since ratio remembers the ratio between share and margin amount */
                     order.buyerShare.mul(getPricePerFullShare()).div(1e18)
                 ), 
                 false /* here we do not farm delivered tokens since they just stay in contract for challenge period at most */
@@ -348,7 +354,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     * @param _orderId the order msg.sender wants to settle at the final stage
      */
     function settle(uint256 _orderId) external {
-
+        require(!paused, "paused");
         require(checkOrderState(_orderId) == OrderState.unsettle, "!unsettle");
         // challenge time has past, anyone can forcely settle this order 
         _settle(_orderId, true);
@@ -364,20 +370,23 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             // send buyer nfts and seller margin
             _multiWithdraw721(order.tokenIds, order.buyer);
             
+            uint bfee = order.deliveryPrice.mul(fee).div(base);
             // carefully check if there is margin left for buyer in case buyer depositted both margin and deliveryPrice at the very first
             uint bsa /*Buyer Share token Amount*/ = order.buyerShare.mul(getPricePerFullShare()).div(1e18);
             // should send extra farmming profit to buyer
-            if (bsa > order.deliveryPrice) {
-                _pushToken(order.buyer, bsa.sub(order.deliveryPrice));
+            if (bsa > order.deliveryPrice.add(bfee)) {
+                _pushToken(order.buyer, bsa.sub(order.deliveryPrice).sub(bfee));
             }
             
-            uint bfee = order.deliveryPrice.mul(fee).div(base);
             // send seller payout
             // uint sellerAmount = order.sellerMargin.add(order.deliveryPrice).sub(bfee);
             uint sellerAmount = order.sellerShare.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
             _pushToken(order.seller, sellerAmount);
             cfee = cfee.add(bfee.mul(2));
-
+            
+            // TODO: delete since farming rewards may be negative
+            require(cfee <= IERC20Upgradeable(marginToken).balanceOf(address(this)), "bad ledger for fee or farmed negs");
+            
             orders[_orderId].state = OrderState.settle;
             emit Settle(_orderId);
             return; // must return here
@@ -392,7 +401,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
                     /* here we send both buyer and seller's margin to buyer except seller's op fee */
                     order.buyerShare.add(order.sellerShare).mul(getPricePerFullShare()).div(1e18).sub(sfee)
                 );
-            } else {
+            } else if (!order.buyerDelivery) {
                 // blame buyer
                 uint bfee = order.buyerMargin.mul(fee).div(base);
                 cfee = cfee.add(bfee);
@@ -439,9 +448,30 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     function collectFee(address _to) external {
         address factory = owner();
         address feeCollector = IHedgehogFactory(factory).feeCollector();
-        require(msg.sender != factory || msg.sender == feeCollector, "!auth");
+        require(msg.sender == factory || msg.sender == feeCollector, "!auth");
         _pushToken(_to, cfee);
         cfee = 0;
+    }
+
+    function _onlyNotProtectedTokens(address _asset) internal view {
+        if (marginToken == eth) {
+            require(_asset != weth, "!weth");
+        }
+        require(_asset != marginToken, "!marginToken");
+        require(_asset != forwardVault, "!forwardVault");
+    }
+
+    function withdrawOther(address _asset, address _to) external virtual {
+        address factory = owner();
+        address feeCollector = IHedgehogFactory(factory).feeCollector();
+        require(msg.sender == owner() || msg.sender == feeCollector, "!auth");
+        _onlyNotProtectedTokens(_asset);
+
+        if (_asset == eth) {
+            payable(_to).transfer(address(this).balance);
+        } else {
+            IERC20Upgradeable(_asset).safeTransfer(_to, IERC20Upgradeable(_asset).balanceOf(address(this)));
+        }
     }
 
     function _pullToken(address usr, uint amount, bool farm) internal returns (uint256 shares) {
@@ -458,9 +488,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
             require(mtNew.sub(mtOld) == amount, "!support taxed token");
         }
 
-        // TODO: check if giving amount to shares is correct when empty forwardVault
         shares = forwardVault != address(0) && farm ? 
-                    // IHForwardVault(forwardVault).deposit(amount).mul(IHForwardVault(forwardVault).getPricePerFullShare()).div(getPricePerFullShare())
                     IHForwardVault(forwardVault).deposit(amount).mul(1e18).div(ratio) /* current line equals above line */
                     :
                     amount.mul(1e18).div(getPricePerFullShare());
@@ -474,8 +502,10 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         if (ava < amount && forwardVault != address(0)) {
             IHForwardVault(forwardVault).withdraw(amount.sub(ava));
         }
-
-        amount = marginToken == eth ? IWETH(weth).balanceOf(address(this)).add(available()) : available();
+        ava = available();
+        if (amount > ava) {
+            amount = marginToken == eth ? IWETH(weth).balanceOf(address(this)).add(ava) : ava;
+        }
         
         if (marginToken == eth) {
             IWETH(weth).withdraw(IWETH(weth).balanceOf(address(this)));

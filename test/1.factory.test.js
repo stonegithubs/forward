@@ -18,7 +18,8 @@ describe("Factory", function () {
         const chainId = (await signers[0].getChainId()).toString()
         console.log("chainId: ", chainId)
         this.dai = alice.address;
-        
+        this.weth = alice.address;
+
         const Forward721Imp = await ethers.getContractFactory(
             "Forward721Upgradeable"
         );
@@ -31,9 +32,9 @@ describe("Factory", function () {
         );
         factory = await upgrades.deployProxy(
             Factory,
-            [forward721Imp.address, [this.dai], feeCollector.address, 1],
+            [forward721Imp.address, [this.dai], feeCollector.address, 1, this.weth],
             {
-                initializer: "initialize"
+                initializer: "__FactoryUpgradeable__init"
             }
         );
         await factory.deployed();
@@ -71,17 +72,26 @@ describe("Factory", function () {
     
     it("Should deploy pool correctly", async() => {
         expect((await factory.allPairsLength()).toString()).to.equal("0");
-        await factory.connect(alice).deployPool(
+        await expectRevert(
+            factory.connect(alice).deployPool(
+                alice.address,
+                721,
+                this.dai
+            ),
+            "!poolDeployer"
+        );
+        await factory.connect(owner).deployPool(
             alice.address,
             721,
             this.dai
         );
         expect((await factory.allPairsLength()).toString()).to.equal("1");
-        await expectRevert(factory.connect(alice).deployPool(
-            alice.address,
-            721,
-            this.dai
-            ), 'pool exist',
+        await expectRevert(factory.connect(owner).deployPool(
+                alice.address,
+                721,
+                this.dai
+            ), 
+            'pool exist',
         );
         expect((await factory.allPairsLength()).toString()).to.equal("1");
     })

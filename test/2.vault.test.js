@@ -50,7 +50,7 @@ describe("Vault", function () {
         expect(await this.mockERC20.name()).to.equal("Token1")
         await this.mockERC20.connect(this.alice).approve(this.mockYVault.address, toWei("100", "ether"));
         expect((await this.mockERC20.allowance(this.alice.address, this.mockYVault.address)).toString()).to.equal(toWei("100", "ether"))
-        await expectRevert(this.mockYVault.test1(), "test1")
+        
         await this.mockYVault.connect(this.alice).deposit(toWei("100", "ether"));
         let aliceShares = (await this.mockYVault.balanceOf(this.alice.address)).toString();
         expect(aliceShares).to.equal(toWei("100", "ether"));

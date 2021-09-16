@@ -140,6 +140,17 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
         return supply == 0 ? 1e18 : balance().mul(1e18).div(supply);
     }
 
+    function _onlyNotProtectedTokens(address _asset) internal view {
+        require(_asset != address(want), "!want");
+        require(_asset != address(yVault), "!ytoken");
+    }
+
+    function withdrawOther(address _asset, address _to) external virtual {
+        require(msg.sender == governance, "!gov");
+        _onlyNotProtectedTokens(_asset);
+        IERC20Upgradeable(_asset).safeTransfer(_to, IERC20Upgradeable(_asset).balanceOf(address(this)));
+    }
+
     function version() external virtual view returns (string memory) {
         return "v1.0";
     }

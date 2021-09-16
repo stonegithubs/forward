@@ -97,12 +97,26 @@ module.exports = {
     apiKey: `${config.etherScanApiKey}`,
   },
   solidity: {
-    version: "0.8.4",
-    settings: {
-      optimizer: {
-        enabled: true, // true for release, false is default for debug and test
-        runs: 200,
+    compilers: [
+      {
+        version: "0.8.4",
+        settings: {
+          optimizer: {
+            enabled: true, // true for release, false is default for debug and test
+            runs: 200,
+          },
+        },
       },
-    },
+      {
+        version: "0.4.18",
+        settings: {
+          optimizer: {
+            enabled: true, // for weth when testing
+            runs: 200,
+          },
+        },
+      }
+    ]
+    
   },
 };

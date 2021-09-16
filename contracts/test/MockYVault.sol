@@ -63,9 +63,7 @@ contract MockYVault is ERC20 {
     function depositAll() external {
         deposit(token.balanceOf(msg.sender));
     }
-    function test1() external {
-        require(false, "test1");
-    }
+   
     function deposit(uint256 _amount) public {
         uint256 _pool = balance();
         uint256 _before = token.balanceOf(address(this));
