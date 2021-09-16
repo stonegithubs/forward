@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
-import "./interface/IYearnYVault.sol";
+import "../interface/IYearnYVault.sol";
 
 contract HForwardVaultUpgradeable is ERC20Upgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;

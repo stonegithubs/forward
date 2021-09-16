@@ -9,44 +9,42 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "./interface/IHedgehogFactory.sol";
-import "./DummyWETH.sol";
-import "./interface/IWETH.sol";
-import "./interface/IHForwardVault.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "../interface/IHedgehogFactory.sol";
+import "../interface/IWETH.sol";
+import "../interface/IHForwardVault.sol";
 
-contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
+contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
 
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using SafeMathUpgradeable for uint;
 
     address public nftAddr;
     address public marginToken;
-    uint public cfee;
 
     address public forwardVault;
     address public eth; 
     address public weth; 
     uint256 public ratio;
+    uint256 public cfee;
     bool public paused;
 
     enum OrderState { inactive, active, dead, fill, challenge, unsettle, settle }
     struct Order {
         address buyer;
-        uint buyerMargin;
-        uint buyerShare;
         address seller;
-        uint sellerMargin;
-        uint sellerShare;
+        uint256 buyerMargin;
+        uint256 buyerShare;
+        uint256 sellerMargin;
+        uint256 sellerShare;
 
+        uint256 validTill;
+        uint256 deliveryPrice;
+        uint256 deliveryTime;
+        uint256 challengeTime;
         uint256[] tokenIds;
-        uint validTill;
-        uint deliveryPrice;
-        uint deliveryTime;
-        uint challengeTime;
         address[] takerWhiteList;
         OrderState state;
-
-
         bool sellerDelivery;
         bool buyerDelivery;
     }
@@ -87,6 +85,8 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     ) public initializer {
         // init ownership
         __Ownable_init();
+
+        __ReentrancyGuard_init();
 
         
         // check conditions
@@ -200,7 +200,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         uint256 _sellerMargin,
         bool _deposit,
         bool _isSeller
-    ) external payable {
+    ) external nonReentrant payable {
         require(!paused, "paused");
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
@@ -282,7 +282,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
         );
     }
 
-    function takeOrder(uint _orderId) external payable {
+    function takeOrder(uint _orderId) external nonReentrant payable {
         require(!paused, "paused");
         address taker = msg.sender;
         // check condition
@@ -316,7 +316,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     * @param _orderId the order msg.sender wants to deliver
      */
     
-    function deliver(uint256 _orderId) external payable {
+    function deliver(uint256 _orderId) external nonReentrant payable {
         require(!paused, "paused");
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.challenge, "!challenge");
@@ -353,7 +353,7 @@ contract Forward721Upgradeable is OwnableUpgradeable, ERC721HolderUpgradeable {
     * @dev anybody can invoke this method to end orderId
     * @param _orderId the order msg.sender wants to settle at the final stage
      */
-    function settle(uint256 _orderId) external {
+    function settle(uint256 _orderId) external nonReentrant {
         require(!paused, "paused");
         require(checkOrderState(_orderId) == OrderState.unsettle, "!unsettle");
         // challenge time has past, anyone can forcely settle this order 

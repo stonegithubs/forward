@@ -6,7 +6,7 @@ import "./proxy/beacon/UpgradeableBeacon.sol";
 import "./proxy/beacon/BeaconProxy.sol";
 import "./interface/IHedgehogFactory.sol";
 import "./proxy/Clones.sol";
-import "./Forward721Upgradeable.sol";
+import "./forward/Forward721Upgradeable.sol";
 
 contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
