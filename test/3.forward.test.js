@@ -80,11 +80,11 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         let validTill;
         let now = await time.latest();
         
-        await this.dai.connect(this.alice).mint(toWei("2", "ether"));
-        await this.dai.connect(this.alice).approve(this.forward721.address, toWei("2", "ether"))
+        await this.dai.connect(this.alice).mint(sellerMargin);
+        await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
         await this.forward721.connect(this.alice).createOrder(
             tokenIds,
-            10 * 60,
+            orderValidPeriod,
             deliveryPrice,
             deliveryPeriod,
             challengePeriod,
