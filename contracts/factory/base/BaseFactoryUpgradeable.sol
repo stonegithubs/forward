@@ -25,6 +25,8 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     address public poolDeployer;
 
+    // only for emergency only if forward721, forward20, forward1155 is attacked
+    bool public paused; 
 
     event PoolCreated(
         address indexed nftAddr,
@@ -173,6 +175,23 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     function version() external virtual override view returns (string memory) {
         return "v1.0";
+    }
+
+    /****************** For Emergency Only Begin *********************/
+    // here we override UpgradeableBeacon's implementation 
+    // in case forward is under attack
+    function implementation() public view virtual override(UpgradeableBeacon, IBeacon) returns (address) {
+        require(!paused, "paused");
+        return super.implementation();
+    }
+
+    // when owner invoke pause, all the created forward contracts should stop working
+    function pause() external virtual onlyOwner {
+        paused = true;
+    }
+
+    function unpause() external virtual onlyOwner {
+        paused = false;
     }
     
 }
