@@ -16,7 +16,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     // orderId => tokenIds
     mapping(uint256 => uint256[]) underlyingAssets;
 
-    function __Forward721__init(
+    function __Forward721Upgradeable__init(
         address _want,
         uint _poolType,
         address _margin
