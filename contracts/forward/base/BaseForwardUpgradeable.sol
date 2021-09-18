@@ -6,7 +6,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "../../interface/IHogletFactory.sol";
-import "../../interface/IWETH.sol";
 import "../../interface/IForwardVault.sol";
 
 
@@ -23,9 +22,8 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     address public margin;
     // forward vault for margin token
     address public fVault;
-    // info of eth and weth
+    // info of eth 
     address public eth;
-    address public weth;
     // cumulative fee
     uint256 public cfee;
     // ratio = value of per share in forward : per share in fVault
@@ -89,7 +87,6 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         require(_factory.ifMarginSupported(_margin), "!margin");
         want = _want;
         margin = _margin;
-        weth = _factory.weth();
         eth = address(0);
         ratio = 1e18;
     }
@@ -120,7 +117,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             
             // enable vault first time
             address fvwant = IForwardVault(_fVault).want();
-            require(fvwant == margin || fvwant == weth, "!want");
+            require(fvwant == margin, "!want");
             // approve margin tokens for new forward vault
             IERC20Upgradeable(fvwant).safeApprove(_fVault, 0);
             IERC20Upgradeable(fvwant).safeApprove(_fVault, type(uint256).max);
@@ -129,7 +126,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             
             // change vault from one to another one
             address fvwant = IForwardVault(_fVault).want();
-            require(fvwant == margin || fvwant == weth, "!want");
+            require(fvwant == margin, "!want");
 
             uint256 oldShares = IForwardVault(fVault).balanceOf(address(this));
             uint256 tokens = oldShares > 0 ? IForwardVault(fVault).withdraw(oldShares) : 0;
@@ -150,12 +147,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             // disable vault finally
             uint256 oldShares = IForwardVault(fVault).balanceOf(address(this));
             uint256 tokens = oldShares > 0 ? IForwardVault(fVault).withdraw(oldShares) : 0;
-            if (margin == eth) {
-                uint _weth = IWETH(weth).balanceOf(address(this));
-                if (_weth > 0) {
-                    IWETH(weth).withdraw(_weth);
-                }
-            }
+            
             // close approval
             IERC20Upgradeable(IForwardVault(fVault).want()).safeApprove(fVault, 0);
             // remember the ratio
@@ -189,7 +181,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     function collectFee(address _to) external {
         address feeCollector = IHogletFactory(factory).feeCollector();
         require(msg.sender == factory || msg.sender == feeCollector, "!auth");
-        _pushTokens(_to, cfee);
+        _pushMargin(_to, cfee);
         cfee = 0;
     }
 
@@ -199,7 +191,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     }
 
     function available() public view returns (uint256) {
-        return margin == address(0) ? address(this).balance : IERC20Upgradeable(margin).balanceOf(address(this));
+        return IERC20Upgradeable(margin).balanceOf(address(this));
     }
     
     function balanceSavingsInHVault() public view returns (uint256) {
@@ -217,17 +209,24 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     function version() external virtual view returns (string memory) {
         return "v1.0";
     }
+    
+    function _sellerDepositWhenCreateOrder(
+        uint256[] memory _tokenIds,
+        uint256 _amount
+    ) internal virtual {}
+
 
     function _createOrder(
-        uint256 _orderValidPeriod, 
+        uint _orderValidPeriod, 
+        uint _nowToDeliverPeriod,
+        uint _deliveryPeriod,
         uint256 _deliveryPrice, 
-        uint256 _nowToDeliverPeriod,
-        uint256 _deliveryPeriod,
         uint256 _buyerMargin,
         uint256 _sellerMargin,
+        address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller, 
-        uint shares
+        uint _shares
     ) internal virtual {
         uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
         uint deliverStart = _getBlockTimestamp().add(_nowToDeliverPeriod);
@@ -237,13 +236,13 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
                 buyer: Dealer({
                     addr: _isSeller ? address(0) : msg.sender,
                     margin: _buyerMargin,
-                    share: _isSeller ? 0 : shares,
+                    share: _isSeller ? 0 : _shares,
                     delivered: _deposit && !_isSeller
                 }),
                 seller: Dealer({
                     addr: _isSeller ? msg.sender : address(0),
                     margin: _sellerMargin,
-                    share: _isSeller ? shares : 0,
+                    share: _isSeller ? _shares : 0,
                     delivered: _deposit && _isSeller
                 }),
                 deliveryPrice: _deliveryPrice,
@@ -254,9 +253,17 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
                 takerWhiteList: new address[](0)
             })
         );
+        uint curOrderIndex = orders.length - 1;
+        
+        if (_takerWhiteList.length > 0) {
+            for (uint i = 0; i < _takerWhiteList.length; i++) {
+                orders[curOrderIndex].takerWhiteList.push(_takerWhiteList[i]);
+            }
+        }
+        emit CreateOrder(curOrderIndex, msg.sender);
     }
 
-    function takeOrder(uint _orderId) external virtual nonReentrant payable {
+    function takeOrder(uint _orderId) external virtual nonReentrant {
         _onlyNotPaused();
         _takeOrder(_orderId);
     }
@@ -273,7 +280,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         }
 
         uint takerMargin = orders[_orderId].seller.addr == address(0) ? orders[_orderId].seller.margin : orders[_orderId].buyer.margin;
-        uint shares = _pullTokens(taker, takerMargin, true);
+        uint shares = _pullMargin(takerMargin, true);
 
         // change storage
         if (orders[_orderId].buyer.addr == address(0)) {
@@ -298,7 +305,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
      */
     function getAmountToDeliver(uint256 _orderId, address _payer) external virtual returns (uint) {}
 
-    function deliver(uint256 _orderId) external virtual nonReentrant payable {}
+    function deliver(uint256 _orderId) external virtual nonReentrant {}
 
     function settle(uint256 _orderId) external virtual nonReentrant{}
 
@@ -331,44 +338,39 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     }
 
     
-    function _pullTokens(address _from, uint amount, bool farm) internal virtual returns (uint shares) {
-        if (margin == eth) {
-            require(msg.value >= amount, "!margin"); // don't send more ether, won't pay you back
-            // if vault exists, chagne ether to weth 
-            if (fVault != address(0)) {
-                IWETH(weth).deposit{value: msg.value}();
-            }
-        } else {
-            uint mtOld = IERC20Upgradeable(margin).balanceOf(address(this));
-            IERC20Upgradeable(margin).safeTransferFrom(_from, address(this), amount);
-            uint mtNew = IERC20Upgradeable(margin).balanceOf(address(this));
-            require(mtNew.sub(mtOld) == amount, "!support taxed token");
-        }
-
-        shares = fVault != address(0) && farm ? 
-                    IForwardVault(fVault).deposit(amount).mul(1e18).div(ratio) /* current line equals above line */
+    function _pullMargin(uint _amount, bool _farm) internal virtual returns (uint shares) {
+        
+        _pullTokensToSelf(margin, _amount);
+        shares = fVault != address(0) && _farm ? 
+                    IForwardVault(fVault).deposit(_amount).mul(1e18).div(ratio) /* current line equals above line */
                     :
-                    amount.mul(1e18).div(getPricePerFullShare());
+                    _amount.mul(1e18).div(getPricePerFullShare());
     }
-    
-    function _pushTokens(address _to, uint amount) internal virtual  {
+
+    function _pullTokensToSelf(address _token, uint _amount) internal virtual {
+        uint mtOld = IERC20Upgradeable(_token).balanceOf(address(this));
+        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        uint mtNew = IERC20Upgradeable(_token).balanceOf(address(this));
+        require(mtNew.sub(mtOld) == _amount, "!support taxed token");
+    }
+
+    function _pushMargin(address _to, uint _amount) internal virtual  {
         // check if balance not enough, if not, withdraw from vault
         uint ava = available();
-        if (ava < amount && fVault != address(0)) {
-            IForwardVault(fVault).withdraw(amount.sub(ava));
+        if (ava < _amount && fVault != address(0)) {
+            IForwardVault(fVault).withdraw(_amount.sub(ava));
         }
         ava = available();
-        if (amount > ava) {
-            amount = margin == eth ? IWETH(weth).balanceOf(address(this)).add(ava) : ava;
+        if (_amount > ava) {
+            _amount = ava;
         }
         
-        if (margin == eth) {
-            IWETH(weth).withdraw(IWETH(weth).balanceOf(address(this)));
-            payable(_to).transfer(amount);
+        _pushTokensFromSelf(margin, _to, _amount);
 
-        } else {
-            IERC20Upgradeable(margin).safeTransfer(_to, amount);
-        }
+    }
+    
+    function _pushTokensFromSelf(address _token, address _to, uint _amount) internal virtual {
+        IERC20Upgradeable(_token).safeTransfer(_to, _amount);
     }
 
     function _withinList(address addr, address[] memory list) internal pure returns (bool) {

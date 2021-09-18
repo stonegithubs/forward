@@ -28,15 +28,15 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     function createOrder(
         uint256[] memory _tokenIds, 
         uint _orderValidPeriod, 
-        uint256 _deliveryPrice,
         uint _nowToDeliverPeriod,
         uint _deliveryPeriod,
-        address[] memory _takerWhiteList,
+        uint256 _deliveryPrice,
         uint256 _buyerMargin,
         uint256 _sellerMargin,
+        address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external nonReentrant payable {
+    ) external nonReentrant {
         _onlyNotPaused();
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
@@ -48,28 +48,30 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         if (_deposit && !_isSeller) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint p = _deliveryPrice.mul(fee.add(base)).div(base);
-            shares = _pullTokens(msg.sender, p, true);
+            shares = _pullMargin(p, true);
         } else {
             // take margin from msg.sender normally
-            shares = _pullTokens(msg.sender, _isSeller ? _sellerMargin : _buyerMargin, true);
+            shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
         }
 
-
         // create order
-        _createOrder(_orderValidPeriod, _deliveryPrice, _nowToDeliverPeriod, _deliveryPeriod, _buyerMargin, _sellerMargin, _deposit, _isSeller, shares);
-        
+        _createOrder(
+            _orderValidPeriod, 
+            _nowToDeliverPeriod, 
+            _deliveryPeriod, 
+            _deliveryPrice, 
+            _buyerMargin, 
+            _sellerMargin,
+            _takerWhiteList, 
+            _deposit, 
+            _isSeller, 
+            shares
+        );
         uint curOrderIndex = orders.length - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
             underlyingAssets[curOrderIndex].push(_tokenIds[i]);
         }
         
-        if (_takerWhiteList.length > 0) {
-            for (uint i = 0; i < _takerWhiteList.length; i++) {
-                orders[curOrderIndex].takerWhiteList.push(_takerWhiteList[i]);
-            }
-        }
-        
-        emit CreateOrder(curOrderIndex, msg.sender);
     }
 
  
@@ -105,7 +107,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     * @dev only maker or taker from orderId's order can invoke this method during challenge period
     * @param _orderId the order msg.sender wants to deliver
      */
-    function deliver(uint256 _orderId) external virtual override nonReentrant payable {
+    function deliver(uint256 _orderId) external virtual override nonReentrant {
         _onlyNotPaused();
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");
@@ -122,8 +124,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             // buyer tends to deliver tokens
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            _pullTokens(
-                sender, 
+            _pullMargin(
                 buyerAmount.sub(
                     order.buyer.share.mul(getPricePerFullShare()).div(1e18)
                 ), 
@@ -164,12 +165,12 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             uint bsa /*Buyer Share token Amount*/ = order.buyer.share.mul(getPricePerFullShare()).div(1e18);
             // should send extra farmming profit to buyer
             if (bsa > order.deliveryPrice.add(bfee)) {
-                _pushTokens(order.buyer.addr, bsa.sub(order.deliveryPrice).sub(bfee));
+                _pushMargin(order.buyer.addr, bsa.sub(order.deliveryPrice).sub(bfee));
             }
             
             // send seller payout
             uint sellerAmount = order.seller.share.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
-            _pushTokens(order.seller.addr, sellerAmount);
+            _pushMargin(order.seller.addr, sellerAmount);
             cfee = cfee.add(bfee.mul(2));
             
             
@@ -182,7 +183,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
                 // blame seller if he/she does not deliver nfts  
                 uint sfee = order.seller.margin.mul(fee).div(base);
                 cfee = cfee.add(sfee);
-                _pushTokens(
+                _pushMargin(
                     order.buyer.addr, 
                     /* here we send both buyer and seller's margin to buyer except seller's op fee */
                     order.buyer.share.add(order.seller.share).mul(getPricePerFullShare()).div(1e18).sub(sfee)
@@ -191,12 +192,14 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
                 // blame buyer
                 uint bfee = order.buyer.margin.mul(fee).div(base);
                 cfee = cfee.add(bfee);
-                _pushTokens(
+                _pushMargin(
                     order.seller.addr,
                     order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
 
             }
+            // return nft (nfts of underlyingAssets[_orderId]) to seller
+            _multiWithdraw721(underlyingAssets[_orderId], order.seller.addr);
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }
@@ -206,9 +209,6 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     
 
     function _onlyNotProtectedTokens(address _asset) internal virtual override view {
-        if (margin == eth) {
-            require(_asset != weth, "!weth");
-        }
         require(_asset != margin, "!margin");
         require(_asset != fVault, "!fVault");
     }

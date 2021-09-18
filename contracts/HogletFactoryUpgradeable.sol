@@ -14,7 +14,7 @@ contract HogletFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     uint256 public constant Base = 10000;
     
     address[] public enabledMargins;
-    mapping(address => int) public supportedMargins;
+    mapping(address => int256) public supportedMargins;
     
     address public override feeCollector;
 
@@ -45,9 +45,10 @@ contract HogletFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         poolDeployer = owner();
 
         enabledMargins.push(address(0));
+        supportedMargins[address(0)] = type(int256).min;
+
         for (uint i = 0; i < _marginTokens.length; i++) {
-            enabledMargins.push(_marginTokens[i]);
-            supportedMargins[_marginTokens[i]] = int(i + 1);
+            supportMargin(_marginTokens[i]);
         }
 
         feeCollector = _feeCollector;
@@ -56,7 +57,7 @@ contract HogletFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         weth = _weth;
     }
 
-    function supportMargin(address _token) external onlyOwner {
+    function supportMargin(address _token) public onlyOwner {
         require(_token != address(0), "!0x00");
 
         require(!ifMarginSupported(_token), "supported already");
@@ -68,9 +69,7 @@ contract HogletFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         }
 
     }
-    function disableToken(address _token) external onlyOwner {
-
-        require(_token != address(0), "!0x00");
+    function disableMargin(address _token) external onlyOwner {
 
         require(ifMarginSupported(_token), "disabled already");
 

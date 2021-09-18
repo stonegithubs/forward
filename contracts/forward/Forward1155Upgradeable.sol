@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
@@ -9,23 +10,35 @@ import "./base/BaseForwardUpgradeable.sol";
 import "../interface/IHogletFactory.sol";
 import "../interface/IForwardVault.sol";
 
-contract Forward20Upgradeable is BaseForwardUpgradeable {
+contract Forward1155Upgradeable is BaseForwardUpgradeable {
     using SafeMathUpgradeable for uint256;
     
-    // orderId => amount of want
-    uint256[] public underlyingAssets;
+    struct Asset {
+        uint256[] ids;
+        uint256[] amounts;
+    }
+    // orderId => Asset
+    Asset[] internal underlyingAssets;
 
-    function __Forward20Upgradeable__init(
+    
+
+    function __Forward1155Upgradeable__init(
         address _want,
         uint _poolType,
         address _margin
     ) public initializer {
         __BaseForward__init(_want, _poolType, _margin);
-        require(_poolType == 20, "!20");
+        require(_poolType == 1155, "!1155");
+    }
+
+    function viewUnderlyingAssets(uint256 _orderId) external view returns (uint256[] memory, uint256[] memory) {
+        Asset memory asset = underlyingAssets[_orderId];
+        return (asset.ids, asset.amounts);
     }
 
     function createOrder(
-        uint256 _underlyingAmount, 
+        uint256[] memory _ids,
+        uint256[] memory _amounts,
         uint _orderValidPeriod, 
         uint _nowToDeliverPeriod,
         uint _deliveryPeriod,
@@ -37,10 +50,10 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         bool _isSeller
     ) external nonReentrant {
         _onlyNotPaused();
-
+        require(_ids.length == _amounts.length, "!len");
         // check if msg.sender wants to deposit _underlyingAmount amount of want directly
         if (_deposit && _isSeller) {
-            _pullTokensToSelf(want, _underlyingAmount);
+            _pull1155TokensToSelf(_ids, _amounts);
         }
 
         // check if msg.sender wants to deposit tokens directly 
@@ -66,8 +79,16 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
             _isSeller, 
             shares
         );
-
-        underlyingAssets.push(_underlyingAmount);
+        underlyingAssets.push(
+            Asset({
+                ids: new uint256[](0),
+                amounts: new uint256[](0)
+            })
+        );
+        for (uint i = 0; i < _ids.length; i++) {
+            underlyingAssets[underlyingAssets.length - 1].ids.push(_ids[i]);
+            underlyingAssets[underlyingAssets.length - 1].amounts.push(_amounts[i]);
+        }
     }
 
     function getAmountToDeliver(uint256 _orderId, address _payer) external virtual override view returns (uint256 price) {
@@ -79,9 +100,9 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
                         order.buyer.share.mul(getPricePerFullShare()).div(1e18)
                     );
         }
-        if (_payer == order.seller.addr && !order.seller.delivered) {
-            price = order.deliveryPrice;
-        }
+        if (_payer == order.seller.addr) {
+            price = order.seller.delivered ? 0 : 1; // here we define 1 as the status of not deliveried
+        } 
     }
 
     function deliver(uint256 _orderId) external virtual override nonReentrant {
@@ -93,7 +114,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
 
         if (sender == order.seller.addr && !order.seller.delivered) {
             // seller tends to deliver underlyingAssets[_orderId] amount of want tokens
-            _pullTokensToSelf(want, underlyingAssets[_orderId]);
+            _pull1155TokensToSelf(underlyingAssets[_orderId].ids, underlyingAssets[_orderId].amounts);
             orders[_orderId].seller.delivered = true;
             emit Delivery(_orderId, sender);
         }
@@ -131,9 +152,10 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         
         Order memory order = orders[_orderId];
         // in case both sides delivered
+        Asset memory asset = underlyingAssets[_orderId];
         if (order.seller.delivered && order.buyer.delivered) {
             // send buyer underlyingAssets[_orderId] amount of want tokens and seller margin
-            _pushTokensFromSelf(want, order.buyer.addr, underlyingAssets[_orderId]);
+            _push1155TokensFromSelf(order.buyer.addr, asset.ids, asset.amounts);
             uint bfee = order.deliveryPrice.mul(fee).div(base);
             // carefully check if there is margin left for buyer in case buyer depositted both margin and deliveryPrice at the very first
             uint bsa /*Buyer Share token Amount*/ = order.buyer.share.mul(getPricePerFullShare()).div(1e18);
@@ -172,8 +194,8 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
                 );
 
             }
-            // return underying assets (underlyingAssets[_orderId] amount of want) to seller
-            _pushTokensFromSelf(want, order.seller.addr, underlyingAssets[_orderId]);
+            // return nft to seller
+            _push1155TokensFromSelf(order.seller.addr, asset.ids, asset.amounts);
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }
@@ -185,5 +207,31 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         require(_asset != fVault, "!fVault");
     }
 
+    function _pull1155TokensToSelf(
+        uint256[] memory _ids,
+        uint256[] memory _amounts
+    ) internal {
+        IERC1155Upgradeable(want).safeBatchTransferFrom(
+            msg.sender, 
+            address(this),
+            _ids,
+            _amounts,
+            ""
+        );
+    }
+    
+    function _push1155TokensFromSelf(
+        address _to,
+        uint256[] memory _ids,
+        uint256[] memory _amounts
+    ) internal {
+        IERC1155Upgradeable(want).safeBatchTransferFrom(
+            address(this),
+            _to, 
+            _ids,
+            _amounts,
+            ""
+        );
+    }
 
 }
