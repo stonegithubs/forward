@@ -4,17 +4,17 @@ pragma solidity ^0.8.0;
 
 import "./proxy/beacon/UpgradeableBeacon.sol";
 import "./proxy/beacon/BeaconProxy.sol";
-import "./interface/IHedgehogFactory.sol";
+import "./interface/IHogletFactory.sol";
 import "./proxy/Clones.sol";
 import "./forward/Forward721Upgradeable.sol";
 
-contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
+contract HogletFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     uint256 public fee;
     uint256 public constant Base = 10000;
     
-    address[] public enabledTokens;
-    mapping(address => int) public supportedTokens;
+    address[] public enabledMargins;
+    mapping(address => int) public supportedMargins;
     
     address public override feeCollector;
 
@@ -44,10 +44,10 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
         poolDeployer = owner();
 
-        enabledTokens.push(address(0));
+        enabledMargins.push(address(0));
         for (uint i = 0; i < _marginTokens.length; i++) {
-            enabledTokens.push(_marginTokens[i]);
-            supportedTokens[_marginTokens[i]] = int(i + 1);
+            enabledMargins.push(_marginTokens[i]);
+            supportedMargins[_marginTokens[i]] = int(i + 1);
         }
 
         feeCollector = _feeCollector;
@@ -56,15 +56,15 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         weth = _weth;
     }
 
-    function supportToken(address _token) external onlyOwner {
+    function supportMargin(address _token) external onlyOwner {
         require(_token != address(0), "!0x00");
 
-        require(!ifTokenSupported(_token), "supported already");
-        if (uint(supportedTokens[_token]) == 0) {
-            enabledTokens.push(_token);
-            supportedTokens[_token] = int(enabledTokens.length);
+        require(!ifMarginSupported(_token), "supported already");
+        if (uint(supportedMargins[_token]) == 0) {
+            enabledMargins.push(_token);
+            supportedMargins[_token] = int(enabledMargins.length);
         } else {
-            supportedTokens[_token] = -supportedTokens[_token];
+            supportedMargins[_token] = -supportedMargins[_token];
         }
 
     }
@@ -72,9 +72,9 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
 
         require(_token != address(0), "!0x00");
 
-        require(ifTokenSupported(_token), "disabled already");
+        require(ifMarginSupported(_token), "disabled already");
 
-        supportedTokens[_token] = -supportedTokens[_token];
+        supportedMargins[_token] = -supportedMargins[_token];
 
     }
 
@@ -92,8 +92,8 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
         Forward721Upgradeable(allPairs[_poolId]).setForwardVault(_forwardVault);
     }
 
-    function ifTokenSupported(address _token) public view override returns (bool) {
-        return _token == address(0) || supportedTokens[_token] > 0;
+    function ifMarginSupported(address _token) public view override returns (bool) {
+        return _token == address(0) || supportedMargins[_token] > 0;
     }
 
     function getOperationFee() external view override returns (uint, uint) {
@@ -124,7 +124,7 @@ contract HedgehogFactoryUpgradeable is UpgradeableBeacon, IHedgehogFactory {
             beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
             
             
-            Forward721Upgradeable(beaconProxyAddr).initialize(_nftAddr, _poolType, _marginToken);
+            Forward721Upgradeable(beaconProxyAddr).__Forward721__init(_nftAddr, _poolType, _marginToken);
 
         } else {
             revert("!support");

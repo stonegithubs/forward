@@ -19,9 +19,10 @@ describe("Forward721 TestCase with marginToken as Ether", function() {
         this.Factory = await ethers.getContractFactory("HedgehogFactoryUpgradeable")
 
         this.YVault = await ethers.getContractFactory("MockYVault")
-        this.HVault = await ethers.getContractFactory("HForwardVaultUpgradeable")
+        this.HVault = await ethers.getContractFactory("FVaultUpgradeable")
 
     })
+
     beforeEach(async() => {
         this.weth = await this.WETH.deploy();
         await this.weth.deployed();
@@ -62,69 +63,71 @@ describe("Forward721 TestCase with marginToken as Ether", function() {
         this.forward721 = await this.Forward721Imp.attach(await this.factory.allPairs(0));
     })
 
-    // it("should take buyer's margin if only seller deliverred correctly", async() => {
-    //     let tokenIds = [0, 1];
-    //     let orderValidPeriod = 10 * 60;
-    //     let deliveryPrice = toWei("123", "ether");
-    //     let deliveryPeriod = 20 * 60;
-    //     let challengePeriod = 10 * 60;
-    //     let buyerMargin = toWei("1", "ether");
-    //     let sellerMargin = toWei("2", "ether");
-    //     let deposit = false;
-    //     let isSeller = true;
-    //     let validTill;
-    //     let now = await time.latest();
+    it("should take buyer's margin if only seller deliverred correctly", async() => {
+        let tokenIds = [0, 1];
+        let orderValidPeriod = 10 * 60;
+        let deliveryPrice = toWei("123", "ether");
+        let deliveryPeriod = 20 * 60;
+        let challengePeriod = 10 * 60;
+        let buyerMargin = toWei("1", "ether");
+        let sellerMargin = toWei("2", "ether");
+        let deposit = false;
+        let isSeller = true;
+        let validTill;
+        let now = await time.latest();
         
-    //     await this.dai.connect(this.alice).mint(sellerMargin);
-    //     await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-    //         await this.forward721.connect(this.alice).createOrder(
-    //             tokenIds,
-    //             10 * 60,
-    //             deliveryPrice,
-    //             deliveryPeriod,
-    //             challengePeriod,
-    //             [],
-    //             buyerMargin,
-    //             sellerMargin,
-    //             deposit,
-    //             isSeller
-    //         );
-    //         await this.dai.connect(this.bob).mint(buyerMargin);
-    //         await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-    //         await this.forward721.connect(this.bob).takeOrder(0);
-
-    //         await network.provider.send("evm_increaseTime", [orderValidPeriod + deliveryPeriod])
-    //         await network.provider.send('evm_mine');
+        await this.dai.connect(this.alice).mint(sellerMargin);
+        await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
+        
+        {    
+            await this.forward721.connect(this.alice).createOrder(
+                tokenIds,
+                10 * 60,
+                deliveryPrice,
+                deliveryPeriod,
+                challengePeriod,
+                [],
+                buyerMargin,
+                sellerMargin,
+                deposit,
+                isSeller,
+                {value: sellerMargin}
+            );
             
-    //         // seller delivers
-    //         for (let i = 0; i < tokenIds.length; i++) {
-    //             await this.nft.connect(this.alice).mint(this.alice.address, tokenIds[i]);
-    //             await this.nft.connect(this.alice).approve(this.forward721.address, tokenIds[i]);
-    //         }
-    //         await this.forward721.connect(this.alice).deliver(0);
-    //         order = await this.forward721.orders(0);
-    //         expect(order.sellerDelivery).to.equal(true);
-    //     }
+            await this.forward721.connect(this.bob).takeOrder(0, {value: buyerMargin});
 
-    //     // now into settling period, yet buyer not deliver
-    //     await network.provider.send("evm_increaseTime", [challengePeriod])
-    //     await network.provider.send('evm_mine');
+            await network.provider.send("evm_increaseTime", [orderValidPeriod + deliveryPeriod])
+            await network.provider.send('evm_mine');
+            
+            // seller delivers
+            for (let i = 0; i < tokenIds.length; i++) {
+                await this.nft.connect(this.alice).mint(this.alice.address, tokenIds[i]);
+                await this.nft.connect(this.alice).approve(this.forward721.address, tokenIds[i]);
+            }
+            await this.forward721.connect(this.alice).deliver(0);
+            order = await this.forward721.orders(0);
+            expect(order.sellerDelivery).to.equal(true);
+        }
+
+        // now into settling period, yet buyer not deliver
+        await network.provider.send("evm_increaseTime", [challengePeriod])
+        await network.provider.send('evm_mine');
         
-    //     order = await this.forward721.orders(0);
-    //     expect(order.buyer).to.equal(this.bob.address)
-    //     expect(order.buyerShare.toString()).to.equal(buyerMargin)
-    //     expect(order.buyerDelivery).to.equal(false)
-    //     expect(order.sellerDelivery).to.equal(true)
-    //     expect((await this.forward721.checkOrderState(0)).toString()).to.equal("5") // challenging
-    //     let oldCfee = await this.forward721.cfee();
-    //     await this.forward721.connect(this.carol).settle(0)
-    //     let newCfee = await this.forward721.cfee();
+        order = await this.forward721.orders(0);
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
+        expect(order.buyerDelivery).to.equal(false)
+        expect(order.sellerDelivery).to.equal(true)
+        expect((await this.forward721.checkOrderState(0)).toString()).to.equal("5") // challenging
+        let oldCfee = await this.forward721.cfee();
+        await this.forward721.connect(this.carol).settle(0)
+        let newCfee = await this.forward721.cfee();
 
-    //     // calculate cfee
-    //     let cfee = (new BN(buyerMargin)).mul(this.opFee).divn(new BN(10000));
-    //     // console.log("cfee       : ", cfee.toString())
-    //     // console.log("actual cfee: ", (newCfee.sub(oldCfee)).toString())
-    //     expect((newCfee.sub(oldCfee)).toString()).to.equal(cfee.toString())
-    // })
+        // calculate cfee
+        let cfee = (new BN(buyerMargin)).mul(this.opFee).divn(new BN(10000));
+        // console.log("cfee       : ", cfee.toString())
+        // console.log("actual cfee: ", (newCfee.sub(oldCfee)).toString())
+        expect((newCfee.sub(oldCfee)).toString()).to.equal(cfee.toString())
+    })
     
 })

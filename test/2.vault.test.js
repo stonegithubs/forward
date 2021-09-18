@@ -31,11 +31,11 @@ describe("Vault", function () {
         console.log('mockYVault.address: ', this.mockYVault.address)
 
 
-        const HForwardVaultUpgradeable = await ethers.getContractFactory(
-            "HForwardVaultUpgradeable"
+        const FVaultUpgradeable = await ethers.getContractFactory(
+            "FVaultUpgradeable"
         );
         this.HVault = await upgrades.deployProxy(
-            HForwardVaultUpgradeable,
+            FVaultUpgradeable,
             [this.mockERC20.address, this.mockYVault.address, this.owner.address, 8000, 500],
             {
                 initializer: "__HForwardVault_init"

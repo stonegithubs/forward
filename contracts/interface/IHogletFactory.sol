@@ -3,11 +3,11 @@
 pragma solidity ^0.8.0;
 
 import "../proxy/beacon/IBeacon.sol";
-interface IHedgehogFactory is IBeacon {
+interface IHogletFactory is IBeacon {
     
     
     // read methods
-    function ifTokenSupported(address coin) external view returns (bool);
+    function ifMarginSupported(address coin) external view returns (bool);
     function getOperationFee() external view returns (uint fee, uint base);
     function feeCollector() external view returns (address);
     function weth() external view returns (address);

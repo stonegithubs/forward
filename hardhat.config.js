@@ -103,7 +103,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true, // true for release, false is default for debug and test
-            runs: 200,
+            runs: 800,
           },
         },
       },

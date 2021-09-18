@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 
 import "../interface/IYearnYVault.sol";
 
-contract HForwardVaultUpgradeable is ERC20Upgradeable {
+contract ForwardVaultUpgradeable is ERC20Upgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using SafeMathUpgradeable for uint;
 
@@ -24,7 +24,7 @@ contract HForwardVaultUpgradeable is ERC20Upgradeable {
     
     constructor() {}
 
-    function __HForwardVault_init(
+    function __ForwardVault_init(
         address _want,
         address _yVault,
         address _governance,

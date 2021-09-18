@@ -18,7 +18,7 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         this.Factory = await ethers.getContractFactory("HedgehogFactoryUpgradeable")
 
         this.YVault = await ethers.getContractFactory("MockYVault")
-        this.HVault = await ethers.getContractFactory("HForwardVaultUpgradeable")
+        this.HVault = await ethers.getContractFactory("FVaultUpgradeable")
 
     })
     beforeEach(async() => {

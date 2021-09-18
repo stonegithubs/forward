@@ -5,203 +5,39 @@ pragma solidity ^0.8.0;
 // ERC721
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "../interface/IHedgehogFactory.sol";
-import "../interface/IWETH.sol";
-import "../interface/IHForwardVault.sol";
+import "./base/BaseForwardUpgradeable.sol";
+import "../interface/IHogletFactory.sol";
 
-contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
+contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeable {
 
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-    using SafeMathUpgradeable for uint;
+    using SafeMathUpgradeable for uint256;
 
-    address public nftAddr;
-    address public marginToken;
+    // orderId => tokenIds
+    mapping(uint256 => uint256[]) underlyingAssets;
 
-    address public forwardVault;
-    address public eth; 
-    address public weth; 
-    uint256 public ratio;
-    uint256 public cfee;
-    bool public paused;
-
-    enum OrderState { inactive, active, dead, fill, challenge, unsettle, settle }
-    struct Order {
-        address buyer;
-        address seller;
-        uint256 buyerMargin;
-        uint256 buyerShare;
-        uint256 sellerMargin;
-        uint256 sellerShare;
-
-        uint256 validTill;
-        uint256 deliveryPrice;
-        uint256 deliveryTime;
-        uint256 challengeTime;
-        uint256[] tokenIds;
-        address[] takerWhiteList;
-        OrderState state;
-        bool sellerDelivery;
-        bool buyerDelivery;
-    }
-    Order[] public orders;
-
-    event CreateOrder(
-        uint orderId,
-        address maker,
-        uint256[] tokenIds,
-        uint validTill,
-        uint deliveryPrice,
-        uint deliveryTime,
-        uint challengeTill,
-        address[] takerWhiteList,
-        bool isSeller
-    );
-    event TakeOrder(
-        uint orderId,
-        address taker,
-        uint takerMargin
-    );
-
-    event Delivery(
-        uint orderId,
-        address sender
-    );
-
-    event Settle(
-        uint orderId
-    );
-
-    constructor() {}
-
-    function initialize(
-        address _nftAddr,
+    function __Forward721__init(
+        address _want,
         uint _poolType,
-        address _marginToken
+        address _margin
     ) public initializer {
-        // init ownership
-        __Ownable_init();
-
-        __ReentrancyGuard_init();
-
-        
-        // check conditions
-        IHedgehogFactory factory = IHedgehogFactory(owner());
+        __BaseForward__init(_want, _poolType, _margin);
         require(_poolType == 721, "!721");
-        require(factory.ifTokenSupported(_marginToken), "margin token not supported");
-
-        // check parameters
-        nftAddr = _nftAddr;
-        marginToken = _marginToken;
-
-        weth = factory.weth();
-        eth = address(0);
-        
-        ratio = 1e18;
-    }
-    
-    function setForwardVault(address _forwardVault) external onlyOwner {
-        if (forwardVault == address(0) && _forwardVault != address(0)) {
-            
-            // enable vault first time
-            address want = IHForwardVault(_forwardVault).want();
-            require(want == marginToken || want == weth, "!want");
-            // approve margin tokens for new forward vault
-            IERC20Upgradeable(want).safeApprove(_forwardVault, 0);
-            IERC20Upgradeable(want).safeApprove(_forwardVault, type(uint256).max);
-
-        } else if (forwardVault != address(0) && _forwardVault != address(0)) {
-            
-            // change vault from one to another one
-            address want = IHForwardVault(_forwardVault).want();
-            require(want == marginToken || want == weth, "!want");
-
-            uint256 oldShares = IHForwardVault(forwardVault).balanceOf(address(this));
-            uint256 tokens = oldShares > 0 ? IHForwardVault(forwardVault).withdraw(oldShares) : 0;
-
-            IERC20Upgradeable(want).safeApprove(forwardVault, 0);
-            
-            IERC20Upgradeable(want).safeApprove(_forwardVault, 0);
-            IERC20Upgradeable(want).safeApprove(_forwardVault, type(uint256).max);
-
-            // ratio = oldShares > 0 ? IHForwardVault(_forwardVault).deposit(tokens).mul(1e18).div(oldShares) : ratio;
-            if (oldShares > 0) {
-                uint newShares = IHForwardVault(_forwardVault).deposit(tokens);
-                ratio = newShares.mul(1e18).div(oldShares);
-            }
-
-        } else if (forwardVault != address(0) && _forwardVault == address(0)) {
-            
-            // disable vault finally
-            uint256 oldShares = IHForwardVault(forwardVault).balanceOf(address(this));
-            uint256 tokens = oldShares > 0 ? IHForwardVault(forwardVault).withdraw(oldShares) : 0;
-            if (marginToken == eth) {
-                uint _weth = IWETH(weth).balanceOf(address(this));
-                if (_weth > 0) {
-                    IWETH(weth).withdraw(_weth);
-                }
-            }
-            // close approval
-            IERC20Upgradeable(IHForwardVault(forwardVault).want()).safeApprove(forwardVault, 0);
-            // remember the ratio
-            if (oldShares > 0) {
-                ratio = tokens.mul(1e18).div(oldShares);
-            }
-            
-
-        } else {
-            revert("nonsense");
-        }
-
-        forwardVault = _forwardVault;
-
-    }
-    
-    function pause() external onlyOwner {
-        paused = true;
-    }
-
-    function unpause() external onlyOwner {
-        paused = false;
-    }
-
-    function balance() public view returns (uint256) {
-        return available().add(balanceSavingsInHVault());
-    }
-
-    function available() public view returns (uint256) {
-        return marginToken == address(0) ? address(this).balance : IERC20Upgradeable(marginToken).balanceOf(address(this));
-    }
-    
-    function balanceSavingsInHVault() public view returns (uint256) {
-        return forwardVault == address(0) ? 0 : IHForwardVault(forwardVault).balanceOf(address(this)).mul(
-                                                    IHForwardVault(forwardVault).getPricePerFullShare()
-                                                ).div(1e18);
-    }
-
-    function getPricePerFullShare() public view returns (uint256) {
-        return forwardVault == address(0) ? 
-            ratio : 
-            ratio.mul(IHForwardVault(forwardVault).getPricePerFullShare()).div(1e18);
     }
 
     function createOrder(
         uint256[] memory _tokenIds, 
-        uint256 _orderValidPeriod, 
-        uint256 _deliveryPrice, 
-        uint256 _deliveryPeriod,
-        uint256 _challengePeriod,
+        uint _orderValidPeriod, 
+        uint256 _deliveryPrice,
+        uint _nowToDeliverPeriod,
+        uint _deliveryPeriod,
         address[] memory _takerWhiteList,
         uint256 _buyerMargin,
         uint256 _sellerMargin,
         bool _deposit,
         bool _isSeller
     ) external nonReentrant payable {
-        require(!paused, "paused");
+        _onlyNotPaused();
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
             _multiDeposit721(_tokenIds);
@@ -210,22 +46,21 @@ contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable
         // check if msg.sender wants to deposit tokens directly 
         uint shares;
         if (_deposit && !_isSeller) {
-            uint256 p;
-            (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
-            p = _deliveryPrice.mul(fee.add(base)).div(base);
-            shares = _pullToken(msg.sender, p, true);
+            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
+            uint p = _deliveryPrice.mul(fee.add(base)).div(base);
+            shares = _pullTokens(msg.sender, p, true);
         } else {
             // take margin from msg.sender normally
-            shares = _pullToken(msg.sender, _isSeller ? _sellerMargin : _buyerMargin, true);
+            shares = _pullTokens(msg.sender, _isSeller ? _sellerMargin : _buyerMargin, true);
         }
 
 
         // create order
-        _pushOrder(_orderValidPeriod, _deliveryPrice, _deliveryPeriod, _challengePeriod, _buyerMargin, _sellerMargin, _deposit, _isSeller, shares);
+        _createOrder(_orderValidPeriod, _deliveryPrice, _nowToDeliverPeriod, _deliveryPeriod, _buyerMargin, _sellerMargin, _deposit, _isSeller, shares);
         
         uint curOrderIndex = orders.length - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
-            orders[curOrderIndex].tokenIds.push(_tokenIds[i]);
+            underlyingAssets[curOrderIndex].push(_tokenIds[i]);
         }
         
         if (_takerWhiteList.length > 0) {
@@ -234,113 +69,67 @@ contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable
             }
         }
         
-        emit CreateOrder(
-            curOrderIndex, 
-            msg.sender, 
-            _tokenIds, 
-            orders[curOrderIndex].validTill, 
-            orders[curOrderIndex].deliveryPrice, 
-            orders[curOrderIndex].deliveryTime, 
-            orders[curOrderIndex].challengeTime, 
-            _takerWhiteList, 
-            _isSeller
-        );
+        emit CreateOrder(curOrderIndex, msg.sender);
     }
 
-    function _pushOrder(
-        uint256 _orderValidPeriod, 
-        uint256 _deliveryPrice, 
-        uint256 _deliveryPeriod,
-        uint256 _challengePeriod,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
-        bool _deposit,
-        bool _isSeller, 
-        uint shares
-    ) internal {
-        uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
-        uint deliveryTime = validTill.add(_deliveryPeriod);
-        uint challengeTime = deliveryTime.add(_challengePeriod);
-        orders.push(
-            Order({
-                buyer: _isSeller ? address(0) : msg.sender,
-                buyerMargin: _buyerMargin,
-                buyerShare: _isSeller ? 0 : shares,
-                seller: _isSeller ? msg.sender : address(0),
-                sellerMargin: _sellerMargin,
-                sellerShare: _isSeller ? shares : 0,
-                tokenIds: new uint256[](0),
-                validTill: validTill,
-                deliveryPrice: _deliveryPrice,
-                deliveryTime: deliveryTime,
-                challengeTime: challengeTime,
-                takerWhiteList: new address[](0),
-                state: OrderState.active,
-                sellerDelivery: _deposit && _isSeller,
-                buyerDelivery: _deposit && !_isSeller
-            })
-        );
-    }
-
-    function takeOrder(uint _orderId) external nonReentrant payable {
-        require(!paused, "paused");
-        address taker = msg.sender;
-        // check condition
-        require(_orderId < orders.length, "!orderId");
+ 
+    /**
+     * @dev only maker or taker from orderId's order be taken as _payer of this method during delivery period, 
+     *       _payer needs to pay the returned margin token to deliver _orderId's order
+     * @param _orderId the order for which we want to check _payers needs to pay at delivery
+     * @param _payer the address which needs to pay for _orderId at delivery
+     * @return price which _payer needs to pay for _orderId for delivery, here means nft numbers if _payer is seller
+     */
+    function getAmountToDeliver(uint256 _orderId, address _payer) external virtual override view returns (uint256 price) {
         Order memory order = orders[_orderId];
-        require(_getBlockTimestamp() <= order.validTill && order.state == OrderState.active, "!valid & !active"); // okay redundant check
         
-        if (order.takerWhiteList.length > 0) {
-            require(_withinList(taker, order.takerWhiteList), "!whitelist");
+        if (_payer == order.buyer.addr && !order.buyer.delivered) {
+            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
+            uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
+            price = buyerAmount.sub(
+                        order.buyer.share.mul(getPricePerFullShare()).div(1e18)
+                    );
         }
-
-        uint takerMargin = orders[_orderId].seller == address(0) ? orders[_orderId].sellerMargin : orders[_orderId].buyerMargin;
-        uint shares = _pullToken(taker, takerMargin, true);
-
-        // change storage
-        if (orders[_orderId].buyer == address(0)) {
-            orders[_orderId].buyer = taker;
-            orders[_orderId].buyerShare = shares;
-        } else if (orders[_orderId].seller == address(0)) {
-            orders[_orderId].seller = taker;
-            orders[_orderId].sellerShare = shares;
-        } else {
-            revert("bug");
+        if (_payer == order.seller.addr && !order.seller.delivered) {
+            uint paid = 0;
+            for(uint i = 0; i < underlyingAssets[_orderId].length; i++) {
+                if (IERC721Upgradeable(want).ownerOf(underlyingAssets[_orderId][i]) == address(this)) {
+                    paid++;
+                }
+            }
+            price = underlyingAssets[_orderId].length.sub(paid);
         }
-        orders[_orderId].state = OrderState.fill;
-        emit TakeOrder(_orderId, taker, takerMargin);
     }
-    
+
     /**
     * @dev only maker or taker from orderId's order can invoke this method during challenge period
     * @param _orderId the order msg.sender wants to deliver
      */
-    
-    function deliver(uint256 _orderId) external nonReentrant payable {
-        require(!paused, "paused");
+    function deliver(uint256 _orderId) external virtual override nonReentrant payable {
+        _onlyNotPaused();
         Order memory order = orders[_orderId];
-        require(checkOrderState(_orderId) == OrderState.challenge, "!challenge");
+        require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");
         address sender = msg.sender;
-        require(sender == order.seller || sender == order.buyer, "only seller & buyer");
+        require(sender == order.seller.addr || sender == order.buyer.addr, "only seller & buyer");
 
-        if (sender == order.seller && !order.sellerDelivery) {
+        if (sender == order.seller.addr && !order.seller.delivered) {
             // seller tends to deliver nfts
-            _multiDeposit721(order.tokenIds);
-            orders[_orderId].sellerDelivery = true;
+            _multiDeposit721(underlyingAssets[_orderId]);
+            orders[_orderId].seller.delivered = true;
             emit Delivery(_orderId, sender);
         }
-        if (sender == order.buyer && !order.buyerDelivery) {
+        if (sender == order.buyer.addr && !order.buyer.delivered) {
             // buyer tends to deliver tokens
-            (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
+            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            _pullToken(
+            _pullTokens(
                 sender, 
                 buyerAmount.sub(
-                    order.buyerShare.mul(getPricePerFullShare()).div(1e18)
+                    order.buyer.share.mul(getPricePerFullShare()).div(1e18)
                 ), 
                 false /* here we do not farm delivered tokens since they just stay in contract for challenge period at most */
             );  
-            orders[_orderId].buyerDelivery = true;
+            orders[_orderId].buyer.delivered = true;
             emit Delivery(_orderId, sender);
         }
 
@@ -353,205 +142,92 @@ contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable
     * @dev anybody can invoke this method to end orderId
     * @param _orderId the order msg.sender wants to settle at the final stage
      */
-    function settle(uint256 _orderId) external nonReentrant {
-        require(!paused, "paused");
-        require(checkOrderState(_orderId) == OrderState.unsettle, "!unsettle");
+    function settle(uint256 _orderId) external virtual override nonReentrant {
+        _onlyNotPaused();
+        require(checkOrderState(_orderId) == OrderState.expired, "!expired");
         // challenge time has past, anyone can forcely settle this order 
         _settle(_orderId, true);
     }
 
 
     function _settle(uint256 _orderId, bool _forceSettle) internal {
-        (uint fee, uint base) = IHedgehogFactory(owner()).getOperationFee();
+        (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
         
         Order memory order = orders[_orderId];
         // in case both sides delivered
-        if (order.sellerDelivery && order.buyerDelivery) {
+        if (order.seller.delivered && order.buyer.delivered) {
             // send buyer nfts and seller margin
-            _multiWithdraw721(order.tokenIds, order.buyer);
+            _multiWithdraw721(underlyingAssets[_orderId], order.buyer.addr);
             
             uint bfee = order.deliveryPrice.mul(fee).div(base);
             // carefully check if there is margin left for buyer in case buyer depositted both margin and deliveryPrice at the very first
-            uint bsa /*Buyer Share token Amount*/ = order.buyerShare.mul(getPricePerFullShare()).div(1e18);
+            uint bsa /*Buyer Share token Amount*/ = order.buyer.share.mul(getPricePerFullShare()).div(1e18);
             // should send extra farmming profit to buyer
             if (bsa > order.deliveryPrice.add(bfee)) {
-                _pushToken(order.buyer, bsa.sub(order.deliveryPrice).sub(bfee));
+                _pushTokens(order.buyer.addr, bsa.sub(order.deliveryPrice).sub(bfee));
             }
             
             // send seller payout
-            // uint sellerAmount = order.sellerMargin.add(order.deliveryPrice).sub(bfee);
-            uint sellerAmount = order.sellerShare.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
-            _pushToken(order.seller, sellerAmount);
+            uint sellerAmount = order.seller.share.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
+            _pushTokens(order.seller.addr, sellerAmount);
             cfee = cfee.add(bfee.mul(2));
             
-            // TODO: delete since farming rewards may be negative
-            require(cfee <= IERC20Upgradeable(marginToken).balanceOf(address(this)), "bad ledger for fee or farmed negs");
             
-            orders[_orderId].state = OrderState.settle;
+            orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
             return; // must return here
         }
         if (_forceSettle) {
-            if (!order.sellerDelivery) {
+            if (!order.seller.delivered) {
                 // blame seller if he/she does not deliver nfts  
-                uint sfee = order.sellerMargin.mul(fee).div(base);
+                uint sfee = order.seller.margin.mul(fee).div(base);
                 cfee = cfee.add(sfee);
-                _pushToken(
-                    order.buyer, 
+                _pushTokens(
+                    order.buyer.addr, 
                     /* here we send both buyer and seller's margin to buyer except seller's op fee */
-                    order.buyerShare.add(order.sellerShare).mul(getPricePerFullShare()).div(1e18).sub(sfee)
+                    order.buyer.share.add(order.seller.share).mul(getPricePerFullShare()).div(1e18).sub(sfee)
                 );
-            } else if (!order.buyerDelivery) {
+            } else if (!order.buyer.delivered) {
                 // blame buyer
-                uint bfee = order.buyerMargin.mul(fee).div(base);
+                uint bfee = order.buyer.margin.mul(fee).div(base);
                 cfee = cfee.add(bfee);
-                _pushToken(
-                    order.seller,
-                    order.sellerShare.add(order.buyerShare).mul(getPricePerFullShare()).div(1e18).sub(bfee)
+                _pushTokens(
+                    order.seller.addr,
+                    order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
 
             }
-            orders[_orderId].state = OrderState.settle;
+            orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }
 
     }
+
     
-    /**
-     * @dev return order state based on orderId
-     * @param _orderId order index whose state to be checked.
-     * @return 
-            0: inactive, or not exist
-            1: active, 
-            2: order is dead, 
-            3: order is filled, 
-            4: order is being challenged between maker and taker,
-            5: challenge ended, yet not settled
-            6: order has been successfully settled
-     */
-    function checkOrderState(uint _orderId) public view returns (OrderState) {
-        Order memory order = orders[_orderId];
-        if (order.validTill == 0 ) return OrderState.inactive;
-        uint time = _getBlockTimestamp();
-        if (time <= order.validTill) return OrderState.active;
-        if (order.buyer == address(0) || order.seller == address(0)) return OrderState.dead;
-        if (time <= order.deliveryTime) return OrderState.fill;
-        if (time <= order.challengeTime) return OrderState.challenge;
-        if (order.state != OrderState.settle) return OrderState.unsettle;
-        return OrderState.settle;
-    }
 
-    function ordersLength() external view returns (uint) {
-        return orders.length;
-    }
-
-    function collectFee(address _to) external {
-        address factory = owner();
-        address feeCollector = IHedgehogFactory(factory).feeCollector();
-        require(msg.sender == factory || msg.sender == feeCollector, "!auth");
-        _pushToken(_to, cfee);
-        cfee = 0;
-    }
-
-    function _onlyNotProtectedTokens(address _asset) internal view {
-        if (marginToken == eth) {
+    function _onlyNotProtectedTokens(address _asset) internal virtual override view {
+        if (margin == eth) {
             require(_asset != weth, "!weth");
         }
-        require(_asset != marginToken, "!marginToken");
-        require(_asset != forwardVault, "!forwardVault");
+        require(_asset != margin, "!margin");
+        require(_asset != fVault, "!fVault");
     }
 
-    function withdrawOther(address _asset, address _to) external virtual {
-        address factory = owner();
-        address feeCollector = IHedgehogFactory(factory).feeCollector();
-        require(msg.sender == owner() || msg.sender == feeCollector, "!auth");
-        _onlyNotProtectedTokens(_asset);
-
-        if (_asset == eth) {
-            payable(_to).transfer(address(this).balance);
-        } else {
-            IERC20Upgradeable(_asset).safeTransfer(_to, IERC20Upgradeable(_asset).balanceOf(address(this)));
-        }
-    }
-
-    function _pullToken(address usr, uint amount, bool farm) internal returns (uint256 shares) {
-        if (marginToken == eth) {
-            require(msg.value >= amount, "!margin"); // don't send more ether, won't pay you back
-            // if vault exists, chagne ether to weth 
-            if (forwardVault != address(0)) {
-                IWETH(weth).deposit{value: msg.value}();
-            }
-        } else {
-            uint mtOld = IERC20Upgradeable(marginToken).balanceOf(address(this));
-            IERC20Upgradeable(marginToken).safeTransferFrom(usr, address(this), amount);
-            uint mtNew = IERC20Upgradeable(marginToken).balanceOf(address(this));
-            require(mtNew.sub(mtOld) == amount, "!support taxed token");
-        }
-
-        shares = forwardVault != address(0) && farm ? 
-                    IHForwardVault(forwardVault).deposit(amount).mul(1e18).div(ratio) /* current line equals above line */
-                    :
-                    amount.mul(1e18).div(getPricePerFullShare());
-
-
-    }
-
-    function _pushToken(address usr, uint amount) internal {
-        // check if balance not enough, if not, withdraw from vault
-        uint ava = available();
-        if (ava < amount && forwardVault != address(0)) {
-            IHForwardVault(forwardVault).withdraw(amount.sub(ava));
-        }
-        ava = available();
-        if (amount > ava) {
-            amount = marginToken == eth ? IWETH(weth).balanceOf(address(this)).add(ava) : ava;
-        }
-        
-        if (marginToken == eth) {
-            IWETH(weth).withdraw(IWETH(weth).balanceOf(address(this)));
-            payable(usr).transfer(amount);
-
-        } else {
-            IERC20Upgradeable(marginToken).safeTransfer(usr, amount);
-        }
-    }
 
     function _multiDeposit721(uint256[] memory _tokenIds) internal {
         for (uint i = 0; i < _tokenIds.length; i++) {
-            _deposit721(_tokenIds[i]);
+            _pullERC721(want, _tokenIds[i]);
         }
-    }
-
-    function _deposit721(uint256 _tokenId) internal {
-
-        _pullERC721(nftAddr, _tokenId);
-        
     }
 
     function _multiWithdraw721(uint256[] memory tokenIds, address to) internal {
         for (uint i = 0; i < tokenIds.length; i++) {
-            _withdraw721(tokenIds[i], to);
+            _pushERC721(want, to, tokenIds[i]);
         }
     }
 
-    function _withdraw721(uint256 tokenId, address to) internal {
-        _pushERC721(nftAddr, to, tokenId);
-    }
 
-    function _withinList(address addr, address[] memory list) internal pure returns (bool) {
-        for (uint i = 0; i < list.length; i++) {
-            if (addr == list[i]) {
-                return true;
-            }
-        }
-        return false;
-    }
 
-    
-    function _getBlockTimestamp() internal view returns (uint) {
-        // solium-disable-next-line security/no-block-members
-        return block.timestamp;
-    }
 
     // Non-standard ERC721 projects:  https://docs.niftex.org/general/supported-nfts
     // implementation refers to: https://github.com/NFTX-project/nftx-protocol-v2/blob/master/contracts/solidity/NFTXVaultUpgradeable.sol#L444
@@ -596,9 +272,4 @@ contract Forward721Upgradeable is OwnableUpgradeable, ReentrancyGuardUpgradeable
         (bool success, bytes memory resultData) = address(assetAddr).call(data);
         require(success, string(resultData));
     }
-
-    function version() external virtual view returns (string memory) {
-        return "v1.0";
-    }
-
 }
