@@ -21,7 +21,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         uint _poolType,
         address _margin
     ) public initializer {
-        __BaseForward__init(_want, _poolType, _margin);
+        __BaseForward__init(_want, _margin);
         require(_poolType == 721, "!721");
     }
 
@@ -196,10 +196,9 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
                     order.seller.addr,
                     order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
-
+                // return nft (nfts of underlyingAssets[_orderId]) to seller
+                _multiWithdraw721(underlyingAssets[_orderId], order.seller.addr);
             }
-            // return nft (nfts of underlyingAssets[_orderId]) to seller
-            _multiWithdraw721(underlyingAssets[_orderId], order.seller.addr);
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }

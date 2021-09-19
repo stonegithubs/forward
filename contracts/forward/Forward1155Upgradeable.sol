@@ -27,7 +27,7 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         uint _poolType,
         address _margin
     ) public initializer {
-        __BaseForward__init(_want, _poolType, _margin);
+        __BaseForward__init(_want, _margin);
         require(_poolType == 1155, "!1155");
     }
 
@@ -192,10 +192,9 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
                     order.seller.addr,
                     order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
-
+                // return nft to seller
+                _push1155TokensFromSelf(order.seller.addr, asset.ids, asset.amounts);
             }
-            // return nft to seller
-            _push1155TokensFromSelf(order.seller.addr, asset.ids, asset.amounts);
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }

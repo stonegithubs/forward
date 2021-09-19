@@ -77,17 +77,14 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
 
     function __BaseForward__init(
         address _want,
-        uint _poolType,
         address _margin
     ) public initializer {
         __ReentrancyGuard_init();
         factory = msg.sender;
-        require(_poolType == 20, "!20");
         IHogletFactory _factory = IHogletFactory(factory);
         require(_factory.ifMarginSupported(_margin), "!margin");
         want = _want;
         margin = _margin;
-        eth = address(0);
         ratio = 1e18;
     }
     
@@ -333,7 +330,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         return OrderState.settled;
     }
 
-    function orderLength() external virtual view returns (uint) {
+    function ordersLength() external virtual view returns (uint) {
         return orders.length;
     }
 

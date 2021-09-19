@@ -20,7 +20,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         uint _poolType,
         address _margin
     ) public initializer {
-        __BaseForward__init(_want, _poolType, _margin);
+        __BaseForward__init(_want, _margin);
         require(_poolType == 20, "!20");
     }
 
@@ -170,10 +170,9 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
                     order.seller.addr,
                     order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
-
+                // return underying assets (underlyingAssets[_orderId] amount of want) to seller
+                _pushTokensFromSelf(want, order.seller.addr, underlyingAssets[_orderId]);
             }
-            // return underying assets (underlyingAssets[_orderId] amount of want) to seller
-            _pushTokensFromSelf(want, order.seller.addr, underlyingAssets[_orderId]);
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
         }

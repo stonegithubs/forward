@@ -31,18 +31,18 @@ describe("Vault", function () {
         console.log('mockYVault.address: ', this.mockYVault.address)
 
 
-        const FVaultUpgradeable = await ethers.getContractFactory(
-            "FVaultUpgradeable"
+        const ForwardVaultUpgradeable = await ethers.getContractFactory(
+            "ForwardVaultUpgradeable"
         );
-        this.HVault = await upgrades.deployProxy(
-            FVaultUpgradeable,
+        this.fVault = await upgrades.deployProxy(
+            ForwardVaultUpgradeable,
             [this.mockERC20.address, this.mockYVault.address, this.owner.address, 8000, 500],
             {
-                initializer: "__HForwardVault_init"
+                initializer: "__ForwardVaultUpgradeable_init"
             }
         );
-        await this.HVault.deployed();
-        console.log('hVault.address: ', this.HVault.address)
+        await this.fVault.deployed();
+        console.log('fVault.address: ', this.fVault.address)
 
     })
 
@@ -61,56 +61,56 @@ describe("Vault", function () {
         aliceShares = (await this.mockYVault.balanceOf(this.alice.address)).toString();
         expect(aliceShares).to.equal("0")
     })
-    it("HVault Should work correctly", async() => {
+    it("fVault Should work correctly", async() => {
         // deposit some want token into yVault to prevent err from yVault.getPricePerFullShare()
         await this.mockERC20.connect(this.alice).approve(this.mockYVault.address, toWei("1", "ether"))
         await this.mockYVault.connect(this.alice).deposit(toWei("1", "ether"))
 
-        expect(await this.HVault.name()).to.equal("hedgehog forward vault Token1")
-        expect(await this.HVault.symbol()).to.equal("hfv T1")
-        expect((await this.HVault.balance()).toString()).to.equal("0")
+        expect(await this.fVault.name()).to.equal("hoglet forward vault Token1")
+        expect(await this.fVault.symbol()).to.equal("hfv T1")
+        expect((await this.fVault.balance()).toString()).to.equal("0")
         await expectRevert(
-            this.HVault.connect(this.alice).setMinTolerance(10001, 500),
+            this.fVault.connect(this.alice).setMinTolerance(10001, 500),
             "!governance"
         )
         await expectRevert(
-            this.HVault.connect(this.owner).setMinTolerance(10001, 500),
+            this.fVault.connect(this.owner).setMinTolerance(10001, 500),
             "!min"
         )
         await expectRevert(
-            this.HVault.connect(this.owner).setMinTolerance(8000, 10000),
+            this.fVault.connect(this.owner).setMinTolerance(8000, 10000),
             "!tolerance"
         )
-        await this.HVault.connect(this.owner).setMinTolerance(8000, 500);
-        expect((await this.HVault.min()).toString()).to.equal("8000")
-        expect((await this.HVault.tolerance()).toString()).to.equal("500")
+        await this.fVault.connect(this.owner).setMinTolerance(8000, 500);
+        expect((await this.fVault.min()).toString()).to.equal("8000")
+        expect((await this.fVault.tolerance()).toString()).to.equal("500")
 
-        await this.HVault.connect(this.owner).setGovernance(this.alice.address)
-        expect(await this.HVault.governance()).to.equal(this.alice.address)
-        await this.HVault.connect(this.alice).setGovernance(this.owner.address)
-        expect(await this.HVault.governance()).to.equal(this.owner.address)
+        await this.fVault.connect(this.owner).setGovernance(this.alice.address)
+        expect(await this.fVault.governance()).to.equal(this.alice.address)
+        await this.fVault.connect(this.alice).setGovernance(this.owner.address)
+        expect(await this.fVault.governance()).to.equal(this.owner.address)
 
-        await this.mockERC20.connect(this.alice).approve(this.HVault.address, toWei("1", "ether"))
-        await this.HVault.connect(this.alice).deposit(toWei("1", "ether"))
-        expect((await this.HVault.balanceOf(this.alice.address)).toString()).to.equal(toWei("1", "ether"))
-        expect((await this.HVault.getPricePerFullShare()).toString()).to.equal(toWei("1", "ether"))
+        await this.mockERC20.connect(this.alice).approve(this.fVault.address, toWei("1", "ether"))
+        await this.fVault.connect(this.alice).deposit(toWei("1", "ether"))
+        expect((await this.fVault.balanceOf(this.alice.address)).toString()).to.equal(toWei("1", "ether"))
+        expect((await this.fVault.getPricePerFullShare()).toString()).to.equal(toWei("1", "ether"))
         
 
-        expect(await this.HVault.version()).to.equal("v1.0")
+        expect(await this.fVault.version()).to.equal("v1.0")
         const TestVaultUpgrade = await ethers.getContractFactory(
             "TestVaultUpgrade"
         );
         await upgrades.upgradeProxy(
-            this.HVault.address,
+            this.fVault.address,
             TestVaultUpgrade
         );
-        expect((await this.HVault.balanceOf(this.alice.address)).toString()).to.equal(toWei("1", "ether"))
-        expect(await this.HVault.version()).to.equal("v1.1")
+        expect((await this.fVault.balanceOf(this.alice.address)).toString()).to.equal(toWei("1", "ether"))
+        expect(await this.fVault.version()).to.equal("v1.1")
 
-        await this.HVault.connect(this.alice).withdraw(
-            await this.HVault.balanceOf(this.alice.address)
+        await this.fVault.connect(this.alice).withdraw(
+            await this.fVault.balanceOf(this.alice.address)
         )
-        expect((await this.HVault.totalSupply()).toString()).to.equal("0")
+        expect((await this.fVault.totalSupply()).toString()).to.equal("0")
     })
     
 })

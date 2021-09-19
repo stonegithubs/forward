@@ -24,7 +24,7 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
     
     constructor() {}
 
-    function __ForwardVault_init(
+    function __ForwardVaultUpgradeable_init(
         address _want,
         address _yVault,
         address _governance,
@@ -32,7 +32,7 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         uint256 _tolerance
     ) public initializer {
         __ERC20_init(
-            string(abi.encodePacked("hedgehog forward vault ", ERC20Upgradeable(_want).name())),
+            string(abi.encodePacked("hoglet forward vault ", ERC20Upgradeable(_want).name())),
             string(abi.encodePacked("hfv ", ERC20Upgradeable(_want).symbol()))
         );
         want = IERC20Upgradeable(_want);

@@ -7,6 +7,7 @@ import "../forward/Forward20Upgradeable.sol";
 
 contract Factory20Upgradeable is BaseFactoryUpgradeable {
 
+
     function _deployPool(
         address _asset,
         uint _poolType,
