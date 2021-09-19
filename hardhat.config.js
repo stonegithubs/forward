@@ -90,7 +90,7 @@ module.exports = {
       // need to run local node manually
       url: "http://localhost:8545",
       allowUnlimitedContractSize: true,
-      timeout: 1800000,
+      timeout: 2800000,
     },
   },
   etherscan: {
@@ -103,7 +103,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true, // true for release, false is default for debug and test
-            runs: 800,
+            runs: 1000,
           },
         },
       },

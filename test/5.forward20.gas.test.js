@@ -4,7 +4,7 @@ const { expect } = require("chai");
 const Web3 = require('web3');
 const toWei = Web3.utils.toWei
 
-describe("Forward20 TestCase with marginToken", function() {
+describe("Forward20 TestCase with marginToken and GasTest", function() {
     before(async() => {
         this.signers = await ethers.getSigners()
         this.alice = this.signers[0]
@@ -13,7 +13,7 @@ describe("Forward20 TestCase with marginToken", function() {
 
         this.WETH = await ethers.getContractFactory("WETH9")
         this.Dai = await ethers.getContractFactory("MockERC20")
-        this.Forward20Imp = await ethers.getContractFactory("Forward20Upgradeable")
+        this.Forward20Imp = await ethers.getContractFactory("GasTestForward20Upgradeable")
         this.Factory20 = await ethers.getContractFactory("Factory20Upgradeable")
 
         this.YVault = await ethers.getContractFactory("MockYVault")
@@ -120,8 +120,8 @@ describe("Forward20 TestCase with marginToken", function() {
         await network.provider.send('evm_mine');
         // now into challenge period or delivery period
         order = await this.forward20.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
         expect((await this.forward20.checkOrderState(0)).toString()).to.equal("4") // delivering
 
         // seller delivers
@@ -133,7 +133,7 @@ describe("Forward20 TestCase with marginToken", function() {
             console.log("gasLimit-----deliver----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         }
         order = await this.forward20.orders(0);
-        expect(order.seller.delivered).to.equal(true);
+        expect(order.sellerDelivered).to.equal(true);
         
         // buyer delivers and settle
         await this.dai.connect(this.bob).mint(deliveryPrice);
@@ -145,7 +145,7 @@ describe("Forward20 TestCase with marginToken", function() {
         }
 
         order = await this.forward20.orders(0);
-        expect(order.buyer.delivered).to.equal(true);
+        expect(order.buyerDelivered).to.equal(true);
         expect(order.state.toString()).to.equal("6"); // settled
         // calculate cfee
         let cfee = (new BN(deliveryPrice)).mul(new BN(2)).mul(this.opFee).div(new BN(this.base)); // * 2 means taking fee from both sides

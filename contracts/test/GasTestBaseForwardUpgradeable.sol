@@ -5,11 +5,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "../../interface/IHogletFactory.sol";
-import "../../interface/IForwardVault.sol";
+import "../interface/IHogletFactory.sol";
+import "../interface/IForwardVault.sol";
 
 
-contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
+contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using SafeMathUpgradeable for uint256;
 
@@ -32,22 +32,25 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     // forward contract status 
     bool public paused;
 
-    enum OrderState { inactive, active, filled, dead, delivery, expired, settled }
-    struct Dealer {
-        uint256 margin;
-        uint256 share;
-        address addr;
-        bool delivered;
-    }
+    enum OrderState { inactive, active, filled, dead, delivery, expired, settled }    
+
     struct Order {
+        // Dealer seller;
+        // Dealer buyer;
+        uint256 buyerMargin;
+        uint256 sellerMargin;
+        uint256 buyerShare;
+        uint256 sellerShare;
         uint256 deliveryPrice;
         uint256 validTill;
         uint256 deliverStart;         // timpstamp
         uint256 expireStart;          // timestamp
-        Dealer seller;
-        Dealer buyer;
-        address[] takerWhiteList;
+        address buyer;
+        address seller;
         OrderState state;
+        bool buyerDelivered;
+        bool sellerDelivered;
+        address[] takerWhiteList;
     }
     Order[] public orders;
 
@@ -230,18 +233,14 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         uint expireStart = deliverStart.add(_deliveryPeriod);
         orders.push(
             Order({
-                buyer: Dealer({
-                    addr: _isSeller ? address(0) : msg.sender,
-                    margin: _buyerMargin,
-                    share: _isSeller ? 0 : _shares,
-                    delivered: _deposit && !_isSeller
-                }),
-                seller: Dealer({
-                    addr: _isSeller ? msg.sender : address(0),
-                    margin: _sellerMargin,
-                    share: _isSeller ? _shares : 0,
-                    delivered: _deposit && _isSeller
-                }),
+                buyer: _isSeller ? address(0) : msg.sender,
+                buyerMargin: _buyerMargin,
+                buyerShare: _isSeller ? 0 : _shares,
+                buyerDelivered: _deposit && !_isSeller,
+                seller: _isSeller ? msg.sender : address(0),
+                sellerMargin: _sellerMargin,
+                sellerShare: _isSeller ? _shares : 0,
+                sellerDelivered: _deposit && _isSeller,
                 deliveryPrice: _deliveryPrice,
                 validTill: validTill,
                 deliverStart: deliverStart,
@@ -276,16 +275,16 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             require(_withinList(taker, order.takerWhiteList), "!whitelist");
         }
 
-        uint takerMargin = orders[_orderId].seller.addr == address(0) ? orders[_orderId].seller.margin : orders[_orderId].buyer.margin;
+        uint takerMargin = orders[_orderId].seller == address(0) ? orders[_orderId].sellerMargin : orders[_orderId].buyerMargin;
         uint shares = _pullMargin(takerMargin, true);
 
         // change storage
-        if (orders[_orderId].buyer.addr == address(0)) {
-            orders[_orderId].buyer.addr = taker;
-            orders[_orderId].buyer.share = shares;
-        } else if (orders[_orderId].seller.addr == address(0)) {
-            orders[_orderId].seller.addr = taker;
-            orders[_orderId].seller.share = shares;
+        if (orders[_orderId].buyer == address(0)) {
+            orders[_orderId].buyer = taker;
+            orders[_orderId].buyerShare = shares;
+        } else if (orders[_orderId].seller == address(0)) {
+            orders[_orderId].seller = taker;
+            orders[_orderId].sellerShare = shares;
         } else {
             revert("bug");
         }
@@ -323,7 +322,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         if (order.validTill == 0 ) return OrderState.inactive;
         uint time = _getBlockTimestamp();
         if (time <= order.validTill) return OrderState.active;
-        if (order.buyer.addr == address(0) || order.seller.addr == address(0)) return OrderState.dead;
+        if (order.buyer == address(0) || order.seller == address(0)) return OrderState.dead;
         if (time <= order.deliverStart) return OrderState.filled;
         if (time <= order.expireStart) return OrderState.delivery;
         if (order.state != OrderState.settled) return OrderState.expired;
@@ -383,6 +382,5 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         // solium-disable-next-line security/no-block-members
         return block.timestamp;
     }
-
     
 }
