@@ -1,7 +1,7 @@
 
-# hedgehog.wtf forward contract protocol
+# hoglet.io forward contract protocol
 
-This repository contains hedeghog forward contracts which are under development currently. 
+This repository contains hoglet forward contracts which are under development currently. 
 
 Factory is responsible for creating forward721 contract, in which we can create forward order, take order, and deliver the promise or forcely close the order. We will be able to make the very personal deal onchain and stake the margin into the forward contract as a promise to deliver the deal. In case one part doesnot fulfill  his/her previous commitment, his/her margin will be lost and given to the countrary part.
 
@@ -15,6 +15,7 @@ npm install --save-dev
 npx hardhat test
 ```
 
+Testing scripts are working properly, deploying scripts to be updated.
 
 
 
