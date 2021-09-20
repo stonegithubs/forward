@@ -15,15 +15,7 @@ contract Factory1155Upgradeable is BaseFactoryUpgradeable {
 
         address beaconProxyAddr;
         if (_poolType == 1155) {
-            // Do use Method 1 
-            // Method 1: deploy new beacon proxy
             beaconProxyAddr = address(new BeaconProxy(address(this), ""));
-
-            // // Method 2: Do NOT use this method
-            // bytes32 salt = keccak256(abi.encodePacked(_asset, _poolType, _margin));
-            // beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
-            
-            
             Forward1155Upgradeable(beaconProxyAddr).__Forward1155Upgradeable__init(_asset, _poolType, _margin);
 
         } else {

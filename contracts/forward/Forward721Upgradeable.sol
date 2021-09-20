@@ -72,37 +72,6 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         }
         
     }
-
- 
-    /**
-     * @dev only maker or taker from orderId's order be taken as _payer of this method during delivery period, 
-     *       _payer needs to pay the returned margin token to deliver _orderId's order
-     * @param _orderId the order for which we want to check _payers needs to pay at delivery
-     * @param _payer the address which needs to pay for _orderId at delivery
-     * @return price which _payer needs to pay for _orderId for delivery, here means nft numbers if _payer is seller
-     */
-    function getAmountToDeliver(uint256 _orderId, address _payer) external virtual override view returns (uint256 price) {
-        Order memory order = orders[_orderId];
-        
-        if (_payer == order.buyer.addr && !order.buyer.delivered) {
-            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            price = buyerAmount.sub(
-                        order.buyer.share.mul(getPricePerFullShare()).div(1e18)
-                    );
-        }
-        if (_payer == order.seller.addr && !order.seller.delivered) {
-            uint paid = 0;
-            for(uint i = 0; i < underlyingAssets[_orderId].length; i++) {
-                if (IERC721Upgradeable(want).ownerOf(underlyingAssets[_orderId][i]) == address(this)) {
-                    paid++;
-                }
-            }
-            price = underlyingAssets[_orderId].length.sub(paid);
-        }
-    }
-
-    
     
     /**
     * @dev only maker or taker from orderId's order can invoke this method during challenge period

@@ -69,19 +69,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         underlyingAssets.push(_underlyingAmount);
     }
 
-    function getAmountToDeliver(uint256 _orderId, address _payer) external virtual override view returns (uint256 price) {
-        Order memory order = orders[_orderId];        
-        if (_payer == order.buyer.addr && !order.buyer.delivered) {
-            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            price = buyerAmount.sub(
-                        order.buyer.share.mul(getPricePerFullShare()).div(1e18)
-                    );
-        }
-        if (_payer == order.seller.addr && !order.seller.delivered) {
-            price = order.deliveryPrice;
-        }
-    }
+
 
     
 

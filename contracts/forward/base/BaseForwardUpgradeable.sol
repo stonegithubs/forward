@@ -203,6 +203,17 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             ratio.mul(IForwardVault(fVault).getPricePerFullShare()).div(1e18);
     }
 
+    
+    function getBuyerAmountToDeliver(uint256 _orderId) external virtual view returns (uint256 price) {
+        Order memory order = orders[_orderId];        
+        if (order.delivered & 0x01 > 0) {
+            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
+            uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
+            price = buyerAmount.sub(order.buyerShare.mul(getPricePerFullShare()).div(1e18));
+        }
+    }
+
+
     function version() external virtual view returns (string memory) {
         return "v1.0";
     }
