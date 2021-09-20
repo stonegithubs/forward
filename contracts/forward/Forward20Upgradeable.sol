@@ -44,14 +44,13 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         }
 
         // check if msg.sender wants to deposit tokens directly 
-        uint shares;
-        if (_deposit && !_isSeller) {
-            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            shares = _pullMargin(_deliveryPrice.mul(fee.add(base)).div(base), true);
-        } else {
-            // take margin from msg.sender normally
-            shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
-        }
+        uint shares = _pullMargin(
+            _deliveryPrice, 
+            _buyerMargin,
+            _sellerMargin,
+            _deposit, 
+            _isSeller
+        );
 
         // create order
         _createOrder(
@@ -84,100 +83,16 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         }
     }
 
-    function deliver(uint256 _orderId) external virtual override nonReentrant {
-        _onlyNotPaused();
-        Order memory order = orders[_orderId];
-        require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");
-        address sender = msg.sender;
-        require(sender == order.seller.addr || sender == order.buyer.addr, "only seller & buyer");
+    
 
-        if (sender == order.seller.addr && !order.seller.delivered) {
-            // seller tends to deliver underlyingAssets[_orderId] amount of want tokens
-            _pullTokensToSelf(want, underlyingAssets[_orderId]);
-            orders[_orderId].seller.delivered = true;
-            emit Delivery(_orderId, sender);
-        }
-        if (sender == order.buyer.addr && !order.buyer.delivered) {
-            // buyer tends to deliver tokens
-            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            _pullMargin(
-                buyerAmount.sub(
-                    order.buyer.share.mul(getPricePerFullShare()).div(1e18)
-                ), 
-                false /* here we do not farm delivered tokens since they just stay in contract for challenge period at most */
-            );  
-            orders[_orderId].buyer.delivered = true;
-            emit Delivery(_orderId, sender);
-        }
-
-        // soft settle means settle if necessary otherwise wait for the counterpart to deliver
-        _settle(_orderId, false); 
+    function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual override {
+        _pullTokensToSelf(want, underlyingAssets[_orderId]);
     }
 
-    /**
-    * @dev anybody can invoke this method to end orderId
-    * @param _orderId the order msg.sender wants to settle at the final stage
-     */
-    function settle(uint256 _orderId) external virtual override nonReentrant {
-        _onlyNotPaused();
-        require(checkOrderState(_orderId) == OrderState.expired, "!expired");
-        // challenge time has past, anyone can forcely settle this order 
-        _settle(_orderId, true);
+    function _pushUnderingAssetsFromSelf(uint256 _orderId, address _to) internal virtual override {
+        _pushTokensFromSelf(want, _to, underlyingAssets[_orderId]);
     }
-
-    function _settle(uint256 _orderId, bool _forceSettle) internal {
-        (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-        
-        Order memory order = orders[_orderId];
-        // in case both sides delivered
-        if (order.seller.delivered && order.buyer.delivered) {
-            // send buyer underlyingAssets[_orderId] amount of want tokens and seller margin
-            _pushTokensFromSelf(want, order.buyer.addr, underlyingAssets[_orderId]);
-            uint bfee = order.deliveryPrice.mul(fee).div(base);
-            // carefully check if there is margin left for buyer in case buyer depositted both margin and deliveryPrice at the very first
-            uint bsa /*Buyer Share token Amount*/ = order.buyer.share.mul(getPricePerFullShare()).div(1e18);
-            // should send extra farmming profit to buyer
-            if (bsa > order.deliveryPrice.add(bfee)) {
-                _pushMargin(order.buyer.addr, bsa.sub(order.deliveryPrice).sub(bfee));
-            }
-            
-            // send seller payout
-            uint sellerAmount = order.seller.share.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
-            _pushMargin(order.seller.addr, sellerAmount);
-            cfee = cfee.add(bfee.mul(2));
-            
-            
-            orders[_orderId].state = OrderState.settled;
-            emit Settle(_orderId);
-            return; // must return here
-        }
-        if (_forceSettle) {
-            if (!order.seller.delivered) {
-                // blame seller if he/she does not deliver nfts  
-                uint sfee = order.seller.margin.mul(fee).div(base);
-                cfee = cfee.add(sfee);
-                _pushMargin(
-                    order.buyer.addr, 
-                    /* here we send both buyer and seller's margin to buyer except seller's op fee */
-                    order.buyer.share.add(order.seller.share).mul(getPricePerFullShare()).div(1e18).sub(sfee)
-                );
-            } else if (!order.buyer.delivered) {
-                // blame buyer
-                uint bfee = order.buyer.margin.mul(fee).div(base);
-                cfee = cfee.add(bfee);
-                _pushMargin(
-                    order.seller.addr,
-                    order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
-                );
-                // return underying assets (underlyingAssets[_orderId] amount of want) to seller
-                _pushTokensFromSelf(want, order.seller.addr, underlyingAssets[_orderId]);
-            }
-            orders[_orderId].state = OrderState.settled;
-            emit Settle(_orderId);
-        }
-    }
-
+    
     function _onlyNotProtectedTokens(address _asset) internal virtual override view {
         require(_asset != want, "!want");
         require(_asset != margin, "!margin");

@@ -1,7 +1,7 @@
 {
-  "name": "forward1",
-  "version": "1.0.0",
-  "description": "forward_hardhat",
+  "name": "forward",
+  "version": "1.0",
+  "description": "hoglet forward contracts",
   "main": "index.js",
   "scripts": {},
   "author": "",
