@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 
 import "./IBeacon.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts-upgradeable/utils/AddressUpgradeable.sol";
 
 /**
  * @dev This contract is used in conjunction with one or more instances of {BeaconProxy} to determine their
@@ -65,7 +65,7 @@ contract UpgradeableBeacon is IBeacon, OwnableUpgradeable {
      * - `newImplementation` must be a contract.
      */
     function _setImplementation(address newImplementation) private {
-        require(Address.isContract(newImplementation), "UpgradeableBeacon: implementation is not a contract");
+        require(AddressUpgradeable.isContract(newImplementation), "UpgradeableBeacon: implementation is not a contract");
         _implementation = newImplementation;
     }
 }
