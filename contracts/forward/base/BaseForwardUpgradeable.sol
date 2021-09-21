@@ -184,14 +184,14 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
 
 
     function balance() public view returns (uint256) {
-        return available().add(balanceSavingsInHVault());
+        return available().add(balanceSavingsInFVault());
     }
 
     function available() public view returns (uint256) {
         return IERC20Upgradeable(margin).balanceOf(address(this));
     }
     
-    function balanceSavingsInHVault() public view returns (uint256) {
+    function balanceSavingsInFVault() public view returns (uint256) {
         return fVault == address(0) ? 0 : IForwardVault(fVault).balanceOf(address(this)).mul(
                                                     IForwardVault(fVault).getPricePerFullShare()
                                                     ).div(1e18);
@@ -312,14 +312,6 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     
     function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual {}
     function _pushUnderingAssetsFromSelf(uint256 _orderId, address _to) internal virtual {}
-    /**
-     * @dev only maker or taker from orderId's order be taken as _payer of this method during delivery period, 
-     *       _payer needs to pay the returned margin token to deliver _orderId's order
-     * @param _orderId the order for which we want to check _payers needs to pay at delivery
-     * @param _payer the address which needs to pay for _orderId at delivery
-     * @return how many margin token _payer needs to pay _orderId in order to deliver
-     */
-    function getAmountToDeliver(uint256 _orderId, address _payer) external virtual returns (uint) {}
 
     function deliver(uint256 _orderId) external virtual nonReentrant {
         _onlyNotPaused();

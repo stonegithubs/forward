@@ -10,3 +10,4 @@ package-lock.json
 /config/*
 .openzeppelin/*
 /test/util*
+abigen

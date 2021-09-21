@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 
 interface IForwardVault is IERC20Upgradeable {
     
-
     // write methods
     function deposit(uint256 _amount) external returns (uint256 shares);
     function depositAll() external returns (uint256 shares);
