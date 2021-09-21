@@ -56,15 +56,6 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
             _pull1155TokensToSelf(_ids, _amounts);
         }
 
-        // check if msg.sender wants to deposit tokens directly 
-        uint shares = _pullMargin(
-            _deliveryPrice, 
-            _buyerMargin,
-            _sellerMargin,
-            _deposit, 
-            _isSeller
-        );
-
         // create order
         _createOrder(
             _orderValidPeriod, 
@@ -75,8 +66,7 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
             _sellerMargin,
             _takerWhiteList, 
             _deposit, 
-            _isSeller, 
-            shares
+            _isSeller
         );
         underlyingAssets.push(
             Asset({

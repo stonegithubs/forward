@@ -206,10 +206,10 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     
     function getBuyerAmountToDeliver(uint256 _orderId) external virtual view returns (uint256 price) {
         Order memory order = orders[_orderId];        
-        if (order.delivered & 0x01 > 0) {
+        if (!order.buyer.delivered) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            price = buyerAmount.sub(order.buyerShare.mul(getPricePerFullShare()).div(1e18));
+            price = buyerAmount.sub(order.buyer.share.mul(getPricePerFullShare()).div(1e18));
         }
     }
 
@@ -218,24 +218,6 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         return "v1.0";
     }
     
-    function _pullMargin(
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
-        bool _deposit,
-        bool _isSeller
-    ) internal virtual returns (uint256 shares) {
-        if (_deposit && !_isSeller) {
-            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            uint p = _deliveryPrice.mul(fee.add(base)).div(base);
-            shares = _pullMargin(p, true);
-        } else {
-            // take margin from msg.sender normally
-            shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
-        }
-    }
-
-
     function _createOrder(
         uint _orderValidPeriod, 
         uint _nowToDeliverPeriod,
@@ -245,12 +227,23 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
-        bool _isSeller, 
-        uint _shares
+        bool _isSeller
     ) internal virtual {
+        uint _shares;
+        if (_deposit && !_isSeller) {
+            (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
+            // uint p = _deliveryPrice.mul(fee.add(base)).div(base);
+            _shares = _pullMargin(_deliveryPrice.mul(fee.add(base)).div(base), true);
+        } else {
+            // take margin from msg.sender normally
+            _shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
+        }
+
+
         uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
         uint deliverStart = _getBlockTimestamp().add(_nowToDeliverPeriod);
         uint expireStart = deliverStart.add(_deliveryPeriod);
+       
         orders.push(
             Order({
                 buyer: Dealer({
@@ -273,6 +266,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
                 takerWhiteList: new address[](0)
             })
         );
+
         uint curOrderIndex = orders.length - 1;
         
         if (_takerWhiteList.length > 0) {
@@ -449,7 +443,7 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     function _pullMargin(uint _amount, bool _farm) internal virtual returns (uint shares) {
         
         _pullTokensToSelf(margin, _amount);
-        shares = fVault != address(0) && _farm ? 
+        shares = _farm && fVault != address(0) ? 
                     IForwardVault(fVault).deposit(_amount).mul(1e18).div(ratio) /* current line equals above line */
                     :
                     _amount.mul(1e18).div(getPricePerFullShare());

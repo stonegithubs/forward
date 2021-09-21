@@ -43,16 +43,6 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             _multiDeposit721(_tokenIds);
         }
 
-        // check if msg.sender wants to deposit tokens directly 
-        uint shares = _pullMargin(
-            _deliveryPrice, 
-            _buyerMargin,
-            _sellerMargin,
-            _deposit, 
-            _isSeller
-        );
-
-
         // create order
         _createOrder(
             _orderValidPeriod, 
@@ -63,8 +53,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             _sellerMargin,
             _takerWhiteList, 
             _deposit, 
-            _isSeller, 
-            shares
+            _isSeller
         );
         uint curOrderIndex = orders.length - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
