@@ -30,6 +30,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     event PoolCreated(
         address indexed nftAddr,
+        address margin,
         uint poolType,
         address marginToken,
         uint index
@@ -112,7 +113,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     ) external virtual {
         require(poolDeployer == address(0) || msg.sender == poolDeployer, "!poolDeployer");
         require(getPair[_asset][_margin] == address(0), "pool exist"); // single check is sufficient
-
+        require(_margin != address(0), "ether as margin not support");
         
         // if (_poolType == 721) {
         //     // Do use Method 1 since when we upgrade the imp, all the pairs' logic will follow the new one
@@ -134,7 +135,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
         allPairs.push(beaconProxyAddr);
 
-        emit PoolCreated(_asset, _poolType, beaconProxyAddr, allPairs.length);
+        emit PoolCreated(_asset, _margin, _poolType, beaconProxyAddr, allPairs.length);
     }
 
     function _deployPool(
