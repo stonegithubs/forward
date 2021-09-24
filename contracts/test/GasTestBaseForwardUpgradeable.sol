@@ -217,31 +217,33 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
 
 
     function _createOrder(
-        uint _orderValidPeriod, 
-        uint _nowToDeliverPeriod,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice, 
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        address _creator,
+        // uint _orderValidPeriod, 
+        // uint _nowToDeliverPeriod,
+        // uint _deliveryPeriod,
+        // uint256 _deliveryPrice, 
+        // uint256 _buyerMargin,
+        // uint256 _sellerMargin,
+        uint256[6] memory _uintData,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller, 
         uint _shares
     ) internal virtual {
-        uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
-        uint deliverStart = _getBlockTimestamp().add(_nowToDeliverPeriod);
-        uint expireStart = deliverStart.add(_deliveryPeriod);
+        uint validTill = _getBlockTimestamp().add(_uintData[0]);
+        uint deliverStart = _getBlockTimestamp().add(_uintData[1]);
+        uint expireStart = deliverStart.add(_uintData[2]);
         orders.push(
             Order({
-                buyer: _isSeller ? address(0) : msg.sender,
-                buyerMargin: _buyerMargin,
+                buyer: _isSeller ? address(0) : _creator,
+                buyerMargin: _uintData[4],
                 buyerShare: _isSeller ? 0 : _shares,
                 buyerDelivered: _deposit && !_isSeller,
-                seller: _isSeller ? msg.sender : address(0),
-                sellerMargin: _sellerMargin,
+                seller: _isSeller ? _creator : address(0),
+                sellerMargin: _uintData[5],
                 sellerShare: _isSeller ? _shares : 0,
                 sellerDelivered: _deposit && _isSeller,
-                deliveryPrice: _deliveryPrice,
+                deliveryPrice: _uintData[3],
                 validTill: validTill,
                 deliverStart: deliverStart,
                 expireStart: expireStart,
@@ -259,20 +261,19 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         emit CreateOrder(curOrderIndex, msg.sender);
     }
 
-    function takeOrder(uint _orderId) external virtual nonReentrant {
+    function takeOrder(address _taker, uint _orderId) external virtual nonReentrant {
         _onlyNotPaused();
-        _takeOrder(_orderId);
+        _takeOrder(_taker, _orderId);
     }
 
-    function _takeOrder(uint _orderId) internal virtual {
-        address taker = msg.sender;
+    function _takeOrder(address _taker, uint _orderId) internal virtual {
         // check condition
         require(_orderId < orders.length, "!orderId");
         Order memory order = orders[_orderId];
         require(_getBlockTimestamp() <= order.validTill && order.state == OrderState.active, "!valid & !active"); // okay redundant check
         
         if (order.takerWhiteList.length > 0) {
-            require(_withinList(taker, order.takerWhiteList), "!whitelist");
+            require(_withinList(_taker, order.takerWhiteList), "!whitelist");
         }
 
         uint takerMargin = orders[_orderId].seller == address(0) ? orders[_orderId].sellerMargin : orders[_orderId].buyerMargin;
@@ -280,16 +281,16 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
 
         // change storage
         if (orders[_orderId].buyer == address(0)) {
-            orders[_orderId].buyer = taker;
+            orders[_orderId].buyer = _taker;
             orders[_orderId].buyerShare = shares;
         } else if (orders[_orderId].seller == address(0)) {
-            orders[_orderId].seller = taker;
+            orders[_orderId].seller = _taker;
             orders[_orderId].sellerShare = shares;
         } else {
             revert("bug");
         }
         orders[_orderId].state = OrderState.filled;
-        emit TakeOrder(_orderId, taker, takerMargin);
+        emit TakeOrder(_orderId, _taker, takerMargin);
     }
     
     /**
@@ -301,7 +302,7 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
      */
     function getAmountToDeliver(uint256 _orderId, address _payer) external virtual returns (uint) {}
 
-    function deliver(uint256 _orderId) external virtual nonReentrant {}
+    function deliver(address _deliverer, uint256 _orderId) external virtual nonReentrant {}
 
     function settle(uint256 _orderId) external virtual nonReentrant{}
 

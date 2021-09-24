@@ -25,13 +25,15 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
     }
 
     function createOrder(
+        address _creator,
         uint256 _underlyingAmount, 
-        uint _orderValidPeriod, 
-        uint _nowToDeliverPeriod,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod, 
+        // uint _nowToDeliverPeriod,
+        // uint _deliveryPeriod,
+        // uint256 _deliveryPrice,
+        // uint256 _buyerMargin,
+        // uint256 _sellerMargin,
+        uint256[6] memory _uintData,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -47,20 +49,22 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
         uint shares;
         if (_deposit && !_isSeller) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            shares = _pullMargin(_deliveryPrice.mul(fee.add(base)).div(base), true);
+            shares = _pullMargin(_uintData[3].mul(fee.add(base)).div(base), true);
         } else {
             // take margin from msg.sender normally
-            shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
+            shares = _pullMargin(_isSeller ? _uintData[5] : _uintData[4], true);
         }
 
         // create order
         _createOrder(
-            _orderValidPeriod, 
-            _nowToDeliverPeriod, 
-            _deliveryPeriod, 
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
+            _creator,
+            // _orderValidPeriod, 
+            // _nowToDeliverPeriod, 
+            // _deliveryPeriod, 
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _uintData,
             _takerWhiteList, 
             _deposit, 
             _isSeller, 
@@ -84,20 +88,20 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
         }
     }
 
-    function deliver(uint256 _orderId) external virtual override nonReentrant {
+    function deliver(address _deliverer, uint256 _orderId) external virtual override nonReentrant {
         _onlyNotPaused();
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");
-        address sender = msg.sender;
-        require(sender == order.seller || sender == order.buyer, "only seller & buyer");
 
-        if (sender == order.seller && !order.sellerDelivered) {
+        require(_deliverer == order.seller || _deliverer == order.buyer, "only seller & buyer");
+
+        if (_deliverer == order.seller && !order.sellerDelivered) {
             // seller tends to deliver underlyingAssets[_orderId] amount of want tokens
             _pullTokensToSelf(want, underlyingAssets[_orderId]);
             orders[_orderId].sellerDelivered = true;
-            emit Delivery(_orderId, sender);
+            emit Delivery(_orderId, _deliverer);
         }
-        if (sender == order.buyer && !order.buyerDelivered) {
+        if (_deliverer == order.buyer && !order.buyerDelivered) {
             // buyer tends to deliver tokens
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
@@ -108,7 +112,7 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
                 false /* here we do not farm delivered tokens since they just stay in contract for challenge period at most */
             );  
             orders[_orderId].buyerDelivered = true;
-            emit Delivery(_orderId, sender);
+            emit Delivery(_orderId, _deliverer);
         }
 
         // soft settle means settle if necessary otherwise wait for the counterpart to deliver

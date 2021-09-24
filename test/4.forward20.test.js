@@ -93,13 +93,14 @@ describe("Forward20 TestCase with marginToken", function() {
             await this.dai.connect(this.alice).approve(this.forward20.address, sellerMargin)
             {
                 const tx = await this.forward20.connect(this.alice).createOrder(
+                    this.alice.address,
                     tokenIds,
-                    orderValidPeriod,
+                    [orderValidPeriod,
                     nowToDeliverPeriod,
                     deliveryPeriod,
                     deliveryPrice,
                     buyerMargin,
-                    sellerMargin,
+                    sellerMargin],
                     [],
                     deposit,
                     isSeller
@@ -110,7 +111,7 @@ describe("Forward20 TestCase with marginToken", function() {
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward20.address, buyerMargin);
             {
-                const tx = await this.forward20.connect(this.bob).takeOrder(0);
+                const tx = await this.forward20.connect(this.bob).takeOrder(this.bob.address, 0);
                 console.log("takerOrder tx is: ", JSON.stringify(tx))
                 console.log("gasLimit-----takeOrder----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
             }
@@ -128,7 +129,7 @@ describe("Forward20 TestCase with marginToken", function() {
         await this.want.connect(this.alice).mint(deliveryPrice)
         await this.want.connect(this.alice).approve(this.forward20.address, deliveryPrice)
         {
-            const tx = await this.forward20.connect(this.alice).deliver(0);
+            const tx = await this.forward20.connect(this.alice).deliver(this.alice.address, 0);
             console.log("deliver tx1 is: ", JSON.stringify(tx))
             console.log("gasLimit-----deliver----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         }
@@ -139,7 +140,7 @@ describe("Forward20 TestCase with marginToken", function() {
         await this.dai.connect(this.bob).mint(deliveryPrice);
         await this.dai.connect(this.bob).approve(this.forward20.address, deliveryPrice)
         {
-            const tx = await this.forward20.connect(this.bob).deliver(0);
+            const tx = await this.forward20.connect(this.bob).deliver(this.bob.address, 0);
             console.log("deliver tx2 is: ", JSON.stringify(tx))
             console.log("gasLimit-----deliver and settle----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         }
