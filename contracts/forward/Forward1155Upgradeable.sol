@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+pragma abicoder v2;
+
+
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -37,14 +40,16 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
     }
 
     function createOrder(
+        address _creator,
         uint256[] memory _ids,
         uint256[] memory _amounts,
-        uint _orderValidPeriod, 
-        uint _nowToDeliverPeriod,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod, 
+        // uint _nowToDeliverPeriod,
+        // uint _deliveryPeriod,
+        // uint256 _deliveryPrice,
+        // uint256 _buyerMargin,
+        // uint256 _sellerMargin,
+        uint256[6] memory _uintData,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -58,12 +63,14 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
 
         // create order
         _createOrder(
-            _orderValidPeriod, 
-            _nowToDeliverPeriod, 
-            _deliveryPeriod, 
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
+            _creator,
+            // _orderValidPeriod, 
+            // _nowToDeliverPeriod, 
+            // _deliveryPeriod, 
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _uintData,
             _takerWhiteList, 
             _deposit, 
             _isSeller

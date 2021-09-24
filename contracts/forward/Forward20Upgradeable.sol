@@ -25,13 +25,15 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
     }
 
     function createOrder(
+        address _creator,
         uint256 _underlyingAmount, 
-        uint _orderValidPeriod, 
-        uint _nowToDeliverPeriod,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod, 
+        // uint _nowToDeliverPeriod,
+        // uint _deliveryPeriod,
+        // uint256 _deliveryPrice,
+        // uint256 _buyerMargin,
+        // uint256 _sellerMargin,
+        uint256[6] memory _uintData,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -45,12 +47,14 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
 
         // create order
         _createOrder(
-            _orderValidPeriod, 
-            _nowToDeliverPeriod, 
-            _deliveryPeriod, 
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
+            _creator,
+            // _orderValidPeriod, 
+            // _nowToDeliverPeriod, 
+            // _deliveryPeriod, 
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _uintData,
             _takerWhiteList, 
             _deposit, 
             _isSeller

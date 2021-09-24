@@ -14,7 +14,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     using SafeMathUpgradeable for uint256;
 
     // orderId => tokenIds
-    mapping(uint256 => uint256[]) underlyingAssets;
+    mapping(uint256 => uint256[]) public underlyingAssets;
 
     function __Forward721Upgradeable__init(
         address _want,
@@ -26,13 +26,15 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     }
 
     function createOrder(
+        address _creator,
         uint256[] memory _tokenIds, 
-        uint _orderValidPeriod, 
-        uint _nowToDeliverPeriod,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod, 
+        // uint _nowToDeliverPeriod,
+        // uint _deliveryPeriod,
+        // uint256 _deliveryPrice,
+        // uint256 _buyerMargin,
+        // uint256 _sellerMargin,
+        uint256[6] memory _uintData,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -45,12 +47,14 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
 
         // create order
         _createOrder(
-            _orderValidPeriod, 
-            _nowToDeliverPeriod, 
-            _deliveryPeriod, 
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
+            _creator,
+            // _orderValidPeriod, 
+            // _nowToDeliverPeriod, 
+            // _deliveryPeriod, 
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _uintData,
             _takerWhiteList, 
             _deposit, 
             _isSeller
