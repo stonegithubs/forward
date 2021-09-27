@@ -24,16 +24,13 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         require(_poolType == 20, "!20");
     }
 
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256 _underlyingAmount, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -46,15 +43,12 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         }
 
         // create order
-        _createOrder(
+        _createOrderFor(
             _creator,
-            // _orderValidPeriod, 
-            // _nowToDeliverPeriod, 
-            // _deliveryPeriod, 
-            // _deliveryPrice, 
-            // _buyerMargin, 
-            // _sellerMargin,
-            _uintData,
+            _nowToDeliverPeriod, 
+            _deliveryPrice, 
+            _buyerMargin, 
+            _sellerMargin,
             _takerWhiteList, 
             _deposit, 
             _isSeller
@@ -62,10 +56,6 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
 
         underlyingAssets.push(_underlyingAmount);
     }
-
-
-
-    
 
     function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual override {
         _pullTokensToSelf(want, underlyingAssets[_orderId]);

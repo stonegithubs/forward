@@ -44,7 +44,6 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         uint256 deliveryPrice;
         uint256 validTill;
         uint256 deliverStart;         // timpstamp
-        uint256 expireStart;          // timestamp
         address buyer;
         address seller;
         OrderState state;
@@ -216,37 +215,33 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     ) internal virtual {}
 
 
-    function _createOrder(
+    function _createOrderFor(
         address _creator,
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice, 
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice, 
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller, 
         uint _shares
     ) internal virtual {
-        uint validTill = _getBlockTimestamp().add(_uintData[0]);
-        uint deliverStart = _getBlockTimestamp().add(_uintData[1]);
-        uint expireStart = deliverStart.add(_uintData[2]);
+        (uint _orderValidPeriod, ) = IHogletFactory(factory).getPeriods();
+        // uint validTill = _getBlockTimestamp().add(_orderValidPeriod);
+        // uint deliverStart = _getBlockTimestamp().add(_nowToDeliverPeriod);
         orders.push(
             Order({
                 buyer: _isSeller ? address(0) : _creator,
-                buyerMargin: _uintData[4],
+                buyerMargin: _buyerMargin,
                 buyerShare: _isSeller ? 0 : _shares,
                 buyerDelivered: _deposit && !_isSeller,
                 seller: _isSeller ? _creator : address(0),
-                sellerMargin: _uintData[5],
+                sellerMargin: _sellerMargin,
                 sellerShare: _isSeller ? _shares : 0,
                 sellerDelivered: _deposit && _isSeller,
-                deliveryPrice: _uintData[3],
-                validTill: validTill,
-                deliverStart: deliverStart,
-                expireStart: expireStart,
+                deliveryPrice: _deliveryPrice,
+                validTill: _getBlockTimestamp().add(_orderValidPeriod),
+                deliverStart: _getBlockTimestamp().add(_nowToDeliverPeriod),
                 state: OrderState.active,
                 takerWhiteList: new address[](0)
             })
@@ -261,12 +256,12 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         emit CreateOrder(curOrderIndex, msg.sender);
     }
 
-    function takeOrder(address _taker, uint _orderId) external virtual nonReentrant {
+    function takeOrderFor(address _taker, uint _orderId) external virtual nonReentrant {
         _onlyNotPaused();
-        _takeOrder(_taker, _orderId);
+        _takeOrderFor(_taker, _orderId);
     }
 
-    function _takeOrder(address _taker, uint _orderId) internal virtual {
+    function _takeOrderFor(address _taker, uint _orderId) internal virtual {
         // check condition
         require(_orderId < orders.length, "!orderId");
         Order memory order = orders[_orderId];
@@ -302,7 +297,7 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
      */
     function getAmountToDeliver(uint256 _orderId, address _payer) external virtual returns (uint) {}
 
-    function deliver(address _deliverer, uint256 _orderId) external virtual nonReentrant {}
+    function deliverFor(address _deliverer, uint256 _orderId) external virtual nonReentrant {}
 
     function settle(uint256 _orderId) external virtual nonReentrant{}
 
@@ -325,7 +320,8 @@ contract GasTestBaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         if (time <= order.validTill) return OrderState.active;
         if (order.buyer == address(0) || order.seller == address(0)) return OrderState.dead;
         if (time <= order.deliverStart) return OrderState.filled;
-        if (time <= order.expireStart) return OrderState.delivery;
+        (, uint _deliveryPeriod ) = IHogletFactory(factory).getPeriods();
+        if (time <= order.deliverStart.add(_deliveryPeriod)) return OrderState.delivery;
         if (order.state != OrderState.settled) return OrderState.expired;
         return OrderState.settled;
     }

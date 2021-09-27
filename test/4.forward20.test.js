@@ -77,9 +77,9 @@ describe("Forward20 TestCase with marginToken", function() {
         }
 
         let tokenIds = toWei("10");
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -92,15 +92,13 @@ describe("Forward20 TestCase with marginToken", function() {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward20.address, sellerMargin)
             {
-                const tx = await this.forward20.connect(this.alice).createOrder(
+                const tx = await this.forward20.connect(this.alice).createOrderFor(
                     this.alice.address,
                     tokenIds,
-                    [orderValidPeriod,
                     nowToDeliverPeriod,
-                    deliveryPeriod,
                     deliveryPrice,
                     buyerMargin,
-                    sellerMargin],
+                    sellerMargin,
                     [],
                     deposit,
                     isSeller
@@ -111,7 +109,7 @@ describe("Forward20 TestCase with marginToken", function() {
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward20.address, buyerMargin);
             {
-                const tx = await this.forward20.connect(this.bob).takeOrder(this.bob.address, 0);
+                const tx = await this.forward20.connect(this.bob).takeOrderFor(this.bob.address, 0);
                 console.log("takerOrder tx is: ", JSON.stringify(tx))
                 console.log("gasLimit-----takeOrder----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
             }
@@ -121,32 +119,32 @@ describe("Forward20 TestCase with marginToken", function() {
         await network.provider.send('evm_mine');
         // now into challenge period or delivery period
         order = await this.forward20.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
         expect((await this.forward20.checkOrderState(0)).toString()).to.equal("4") // delivering
 
         // seller delivers
         await this.want.connect(this.alice).mint(deliveryPrice)
         await this.want.connect(this.alice).approve(this.forward20.address, deliveryPrice)
         {
-            const tx = await this.forward20.connect(this.alice).deliver(this.alice.address, 0);
+            const tx = await this.forward20.connect(this.alice).deliverFor(this.alice.address, 0);
             console.log("deliver tx1 is: ", JSON.stringify(tx))
             console.log("gasLimit-----deliver----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         }
         order = await this.forward20.orders(0);
-        expect(order.seller.delivered).to.equal(true);
+        expect(order.sellerDelivered).to.equal(true);
         
         // buyer delivers and settle
         await this.dai.connect(this.bob).mint(deliveryPrice);
         await this.dai.connect(this.bob).approve(this.forward20.address, deliveryPrice)
         {
-            const tx = await this.forward20.connect(this.bob).deliver(this.bob.address, 0);
+            const tx = await this.forward20.connect(this.bob).deliverFor(this.bob.address, 0);
             console.log("deliver tx2 is: ", JSON.stringify(tx))
             console.log("gasLimit-----deliver and settle----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         }
 
         order = await this.forward20.orders(0);
-        expect(order.buyer.delivered).to.equal(true);
+        expect(order.buyerDelivered).to.equal(true);
         expect(order.state.toString()).to.equal("6"); // settled
         // calculate cfee
         let cfee = (new BN(deliveryPrice)).mul(new BN(2)).mul(this.opFee).div(new BN(this.base)); // * 2 means taking fee from both sides

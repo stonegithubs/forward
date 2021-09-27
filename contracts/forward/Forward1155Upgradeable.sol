@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-pragma abicoder v2;
-
 
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/utils/ERC1155HolderUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.sol";
@@ -21,7 +19,7 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         uint256[] amounts;
     }
     // orderId => Asset
-    Asset[] internal underlyingAssets;
+    Asset[] internal underlyingAssets_;
 
     
 
@@ -34,22 +32,19 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         require(_poolType == 1155, "!1155");
     }
 
-    function viewUnderlyingAssets(uint256 _orderId) external view returns (uint256[] memory, uint256[] memory) {
-        Asset memory asset = underlyingAssets[_orderId];
+    function underlyingAssets(uint256 _orderId) external view returns (uint256[] memory, uint256[] memory) {
+        Asset memory asset = underlyingAssets_[_orderId];
         return (asset.ids, asset.amounts);
     }
 
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256[] memory _ids,
         uint256[] memory _amounts,
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -62,37 +57,34 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         }
 
         // create order
-        _createOrder(
+        _createOrderFor(
             _creator,
-            // _orderValidPeriod, 
-            // _nowToDeliverPeriod, 
-            // _deliveryPeriod, 
-            // _deliveryPrice, 
-            // _buyerMargin, 
-            // _sellerMargin,
-            _uintData,
+            _nowToDeliverPeriod, 
+            _deliveryPrice, 
+            _buyerMargin, 
+            _sellerMargin,
             _takerWhiteList, 
             _deposit, 
             _isSeller
         );
-        underlyingAssets.push(
+        underlyingAssets_.push(
             Asset({
                 ids: new uint256[](0),
                 amounts: new uint256[](0)
             })
         );
         for (uint i = 0; i < _ids.length; i++) {
-            underlyingAssets[underlyingAssets.length - 1].ids.push(_ids[i]);
-            underlyingAssets[underlyingAssets.length - 1].amounts.push(_amounts[i]);
+            underlyingAssets_[underlyingAssets_.length - 1].ids.push(_ids[i]);
+            underlyingAssets_[underlyingAssets_.length - 1].amounts.push(_amounts[i]);
         }
     }
 
     function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual override {
-        _pull1155TokensToSelf(underlyingAssets[_orderId].ids, underlyingAssets[_orderId].amounts);
+        _pull1155TokensToSelf(underlyingAssets_[_orderId].ids, underlyingAssets_[_orderId].amounts);
     }
 
     function _pushUnderingAssetsFromSelf(uint256 _orderId, address _to) internal virtual override {
-        Asset memory asset = underlyingAssets[_orderId];
+        Asset memory asset = underlyingAssets_[_orderId];
         _push1155TokensFromSelf(_to, asset.ids, asset.amounts);
     }
 

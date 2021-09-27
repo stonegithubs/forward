@@ -20,24 +20,21 @@ interface IWETH {
 
 
 interface IBaseForward {
-    function takeOrder(address _taker, uint _orderId) external;
-    function deliver(address _deliverer, uint _orderId) external;
+    function takeOrderFor(address _taker, uint _orderId) external;
+    function deliverFor(address _deliverer, uint _orderId) external;
     function settle(uint _orderId) external;
 
     function margin() external view returns (address);
 }
 
 interface IForward20 is IBaseForward {
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256 _underlyingAmount, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -45,16 +42,13 @@ interface IForward20 is IBaseForward {
 }
 
 interface IForward721 is IBaseForward {
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256[] memory _tokenIds, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -62,17 +56,14 @@ interface IForward721 is IBaseForward {
 }
 
 interface IForward1155 is IBaseForward {
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256[] memory _ids,
         uint256[] memory _amounts, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -85,11 +76,14 @@ contract ForwardEtherRouter {
         weth = IWETH(_weth);
     }
     
-    function createOrder20(
+    function createOrder20For(
         address _forward20,
         address _creator,
         uint256 _underlyingAmount,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -101,10 +95,13 @@ contract ForwardEtherRouter {
             weth.approve(_forward20, type(uint256).max);
         }
         
-        IForward20(_forward20).createOrder(
+        IForward20(_forward20).createOrderFor(
             _creator,
             _underlyingAmount,
-            _uintData,
+            _nowToDeliverPeriod,
+            _deliveryPrice,
+            _buyerMargin,
+            _sellerMargin,
             _takerWhiteList,
             _deposit,
             _isSeller
@@ -115,11 +112,14 @@ contract ForwardEtherRouter {
         }
     }
 
-    function createOrder721(
+    function createOrder721For(
         address _forward721,
         address _creator,
         uint256[] memory _tokenIds,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -131,10 +131,13 @@ contract ForwardEtherRouter {
             weth.approve(_forward721, type(uint256).max);
         }
         
-        IForward721(_forward721).createOrder(
+        IForward721(_forward721).createOrderFor(
             _creator,
             _tokenIds,
-            _uintData,
+            _nowToDeliverPeriod,
+            _deliveryPrice,
+            _buyerMargin,
+            _sellerMargin,
             _takerWhiteList,
             _deposit,
             _isSeller
@@ -145,12 +148,15 @@ contract ForwardEtherRouter {
         }
     }
 
-    function createOrder1155(
+    function createOrder1155For(
         address _forward1155,
         address _creator,
         uint256[] memory _ids,
         uint256[] memory _amounts,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -162,11 +168,14 @@ contract ForwardEtherRouter {
             weth.approve(_forward1155, type(uint256).max);
         }
         
-        IForward1155(_forward1155).createOrder(
+        IForward1155(_forward1155).createOrderFor(
             _creator,
             _ids,
             _amounts,
-            _uintData,
+            _nowToDeliverPeriod,
+            _deliveryPrice,
+            _buyerMargin,
+            _sellerMargin,
             _takerWhiteList,
             _deposit,
             _isSeller
@@ -178,14 +187,14 @@ contract ForwardEtherRouter {
         }
     }
 
-    function takeOrder(
+    function takeOrderFor(
         address _forward,
         address _taker,
         uint _orderId
     ) external payable {
         require(IForward20(_forward).margin() == address(weth), "margin not weth");
         weth.deposit{value: msg.value}();
-        IBaseForward(_forward).takeOrder(_taker, _orderId);
+        IBaseForward(_forward).takeOrderFor(_taker, _orderId);
 
         if (weth.balanceOf(address(this)) > 0) {
             weth.withdraw(weth.balanceOf(address(this)));
@@ -193,7 +202,7 @@ contract ForwardEtherRouter {
         }
     }
 
-    function deliver(
+    function deliverFor(
         address _forward,
         address _deliverer,
         uint _orderId
@@ -201,7 +210,7 @@ contract ForwardEtherRouter {
         require(IForward20(_forward).margin() == address(weth), "margin not weth");
         weth.deposit{value: msg.value}();
 
-        IBaseForward(_forward).deliver(_deliverer, _orderId);
+        IBaseForward(_forward).deliverFor(_deliverer, _orderId);
 
         if (weth.balanceOf(address(this)) > 0) {
             weth.withdraw(weth.balanceOf(address(this)));
@@ -218,4 +227,5 @@ contract ForwardEtherRouter {
 
     // receive ether paid from weth
     receive() external payable {}
+    // function() external payable {}
 }

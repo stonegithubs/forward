@@ -24,51 +24,39 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
         require(_poolType == 20, "!20");
     }
 
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256 _underlyingAmount, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
     ) external nonReentrant {
         _onlyNotPaused();
 
-        // check if msg.sender wants to deposit _underlyingAmount amount of want directly
-        if (_deposit && _isSeller) {
-            _pullTokensToSelf(want, _underlyingAmount);
-        }
-
-        // check if msg.sender wants to deposit tokens directly 
-        uint shares;
+        uint _shares;
         if (_deposit && !_isSeller) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            shares = _pullMargin(_uintData[3].mul(fee.add(base)).div(base), true);
+            _shares = _pullMargin(_deliveryPrice.mul(fee.add(base)).div(base), true);
         } else {
             // take margin from msg.sender normally
-            shares = _pullMargin(_isSeller ? _uintData[5] : _uintData[4], true);
+            _shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
         }
 
         // create order
-        _createOrder(
+        _createOrderFor(
             _creator,
-            // _orderValidPeriod, 
-            // _nowToDeliverPeriod, 
-            // _deliveryPeriod, 
-            // _deliveryPrice, 
-            // _buyerMargin, 
-            // _sellerMargin,
-            _uintData,
+            _nowToDeliverPeriod, 
+            _deliveryPrice, 
+            _buyerMargin, 
+            _sellerMargin,
             _takerWhiteList, 
             _deposit, 
-            _isSeller, 
-            shares
+            _isSeller,
+            _shares
         );
 
         underlyingAssets.push(_underlyingAmount);
@@ -88,7 +76,7 @@ contract GasTestForward20Upgradeable is GasTestBaseForwardUpgradeable {
         }
     }
 
-    function deliver(address _deliverer, uint256 _orderId) external virtual override nonReentrant {
+    function deliverFor(address _deliverer, uint256 _orderId) external virtual override nonReentrant {
         _onlyNotPaused();
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");

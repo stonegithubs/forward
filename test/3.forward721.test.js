@@ -69,9 +69,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
     
     it("should createOrder correctly", async()=> {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -82,15 +82,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         
         await this.dai.connect(this.alice).mint(sellerMargin);
         await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-        await this.forward721.connect(this.alice).createOrder(
+        await this.forward721.connect(this.alice).createOrderFor(
             this.alice.address,
             tokenIds,
-            [orderValidPeriod,
             nowToDeliverPeriod,
-            deliveryPeriod,
             deliveryPrice,
             buyerMargin,
-            sellerMargin],
+            sellerMargin,
             [],
             deposit,
             isSeller
@@ -103,29 +101,28 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
 
         let order = await this.forward721.orders(0);
         // console.log("order is ", JSON.stringify(order))
-        // console.log("order.buyer is ", order.buyer.addr)
-        expect(order.buyer.addr).to.equal(constants.ZERO_ADDRESS)
-        expect(order.buyer.margin.toString()).to.equal(buyerMargin)
-        expect(order.buyer.share.toString()).to.equal("0")
-        expect(order.seller.addr).to.equal(this.alice.address)
-        expect(order.seller.margin.toString()).to.equal(sellerMargin)
-        expect(order.seller.share.toString()).to.equal(sellerMargin)
+        // console.log("order.buyer is ", order.buyer)
+        expect(order.buyer).to.equal(constants.ZERO_ADDRESS)
+        expect(order.buyerMargin.toString()).to.equal(buyerMargin)
+        expect(order.buyerShare.toString()).to.equal("0")
+        expect(order.seller).to.equal(this.alice.address)
+        expect(order.sellerMargin.toString()).to.equal(sellerMargin)
+        expect(order.sellerShare.toString()).to.equal(sellerMargin)
         expect(order.validTill.toString()).to.equal(validTill.toString())
         expect(order.deliveryPrice.toString()).to.equal(deliveryPrice)
         expect(order.deliverStart.toString()).to.equal(deliverStart.toString())
-        expect(order.expireStart.toString()).to.equal(expireStart.toString())
         expect(order.state.toString()).to.equal("1") // active
-        expect(order.seller.delivered).to.equal(deposit && isSeller);
-        expect(order.buyer.delivered).to.equal(deposit && !isSeller);
+        expect(order.sellerDelivered).to.equal(deposit && isSeller);
+        expect(order.buyerDelivered).to.equal(deposit && !isSeller);
         
         expect((await this.forward721.ordersLength()).toString()).to.equal("1")
     })
     
     it("should NOT take order", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -137,15 +134,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
@@ -153,14 +148,14 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         }
 
         await expectRevert(
-            this.forward721.connect(this.bob).takeOrder(this.bob.address, 1),
+            this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 1),
             "!orderId"
         );
 
         await network.provider.send("evm_increaseTime", [orderValidPeriod + 100])
         await network.provider.send('evm_mine');
         await expectRevert(
-            this.forward721.connect(this.bob).takeOrder(this.alice.address, 0),
+            this.forward721.connect(this.bob).takeOrderFor(this.alice.address, 0),
             "!valid & !active"
         );
         expect((await this.forward721.checkOrderState(0)).toString()).to.equal("3") // dead
@@ -168,9 +163,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
     })
     it("should take order correctly", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -182,15 +177,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
@@ -200,17 +193,17 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         expect((await this.dai.balanceOf(this.bob.address)).toString()).to.equal(buyerMargin);
         await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
         expect((await this.dai.allowance(this.bob.address, this.forward721.address)).toString()).to.equal(buyerMargin);
-        await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+        await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
         let order = await this.forward721.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
         expect(order.state.toString()).to.equal("2") // order filled
     })
     it("should deliver correctly for both seller and buyer", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -222,30 +215,28 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
             );
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-            await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+            await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
         }
 
         await network.provider.send("evm_increaseTime", [nowToDeliverPeriod])
         await network.provider.send('evm_mine');
         // now into challenge period or delivery period
         order = await this.forward721.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
         expect((await this.forward721.checkOrderState(0)).toString()).to.equal("4") // delivering
 
         // seller delivers
@@ -253,17 +244,17 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.nft.connect(this.alice).mint(this.alice.address, tokenIds[i]);
             await this.nft.connect(this.alice).approve(this.forward721.address, tokenIds[i]);
         }
-        await this.forward721.connect(this.alice).deliver(this.alice.address, 0);
+        await this.forward721.connect(this.alice).deliverFor(this.alice.address, 0);
         order = await this.forward721.orders(0);
-        expect(order.seller.delivered).to.equal(true);
+        expect(order.sellerDelivered).to.equal(true);
         
         // buyer delivers and settle
         await this.dai.connect(this.bob).mint(deliveryPrice);
         await this.dai.connect(this.bob).approve(this.forward721.address, deliveryPrice)
-        await this.forward721.connect(this.bob).deliver(this.bob.address, 0);
+        await this.forward721.connect(this.bob).deliverFor(this.bob.address, 0);
         
         order = await this.forward721.orders(0);
-        expect(order.buyer.delivered).to.equal(true);
+        expect(order.buyerDelivered).to.equal(true);
         expect(order.state.toString()).to.equal("6"); // settled
         // calculate cfee
         let cfee = (new BN(deliveryPrice)).mul(new BN(2)).mul(this.opFee).divn(new BN(this.base)); // * 2 means taking fee from both sides
@@ -274,9 +265,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
     })
     it("should take seller's margin if only buyer deliverred correctly", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -288,39 +279,37 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
             );
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-            await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+            await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
             
             
             // buyer delivers 
             await network.provider.send("evm_increaseTime", [nowToDeliverPeriod])
             await this.dai.connect(this.bob).mint(deliveryPrice);
             await this.dai.connect(this.bob).approve(this.forward721.address, deliveryPrice)
-            await this.forward721.connect(this.bob).deliver(this.bob.address, 0);
+            await this.forward721.connect(this.bob).deliverFor(this.bob.address, 0);
         }
 
         await network.provider.send("evm_increaseTime", [deliveryPeriod])
         await network.provider.send('evm_mine');
         // now into settling period, yet seller not deliver
         order = await this.forward721.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
-        expect(order.buyer.delivered).to.equal(true)
-        expect(order.seller.delivered).to.equal(false)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
+        expect(order.buyerDelivered).to.equal(true)
+        expect(order.sellerDelivered).to.equal(false)
         expect((await this.forward721.checkOrderState(0)).toString()).to.equal("5") // expired and unsettled 
         let oldCfee = await this.forward721.cfee();
         await this.forward721.connect(this.carol).settle(0)
@@ -334,9 +323,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
     })
     it("should take buyer's margin if only seller deliverred correctly", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -348,22 +337,20 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
             );
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-            await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+            await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
 
             await network.provider.send("evm_increaseTime", [nowToDeliverPeriod])
             await network.provider.send('evm_mine');
@@ -373,9 +360,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
                 await this.nft.connect(this.alice).mint(this.alice.address, tokenIds[i]);
                 await this.nft.connect(this.alice).approve(this.forward721.address, tokenIds[i]);
             }
-            await this.forward721.connect(this.alice).deliver(this.alice.address, 0);
+            await this.forward721.connect(this.alice).deliverFor(this.alice.address, 0);
             order = await this.forward721.orders(0);
-            expect(order.seller.delivered).to.equal(true);
+            expect(order.sellerDelivered).to.equal(true);
         }
 
         // now into settling period, yet buyer not deliver
@@ -383,10 +370,10 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         await network.provider.send('evm_mine');
         
         order = await this.forward721.orders(0);
-        expect(order.buyer.addr).to.equal(this.bob.address)
-        expect(order.buyer.share.toString()).to.equal(buyerMargin)
-        expect(order.buyer.delivered).to.equal(false)
-        expect(order.seller.delivered).to.equal(true)
+        expect(order.buyer).to.equal(this.bob.address)
+        expect(order.buyerShare.toString()).to.equal(buyerMargin)
+        expect(order.buyerDelivered).to.equal(false)
+        expect(order.sellerDelivered).to.equal(true)
         expect((await this.forward721.checkOrderState(0)).toString()).to.equal("5") // challenging
         let oldCfee = await this.forward721.cfee();
         await this.forward721.connect(this.carol).settle(0)
@@ -400,9 +387,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
     })
     it("Should invoke factory.collectFee correctly", async() => {
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -414,22 +401,20 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
             );
             await this.dai.connect(this.bob).mint(buyerMargin);
             await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-            await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+            await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
 
             await network.provider.send("evm_increaseTime", [nowToDeliverPeriod])
             await network.provider.send('evm_mine');
@@ -440,7 +425,7 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
                 await this.nft.connect(this.alice).mint(this.alice.address, tokenIds[i]);
                 await this.nft.connect(this.alice).approve(this.forward721.address, tokenIds[i]);
             }
-            await this.forward721.connect(this.alice).deliver(this.alice.address, 0);
+            await this.forward721.connect(this.alice).deliverFor(this.alice.address, 0);
             // buyer-bob should have 1 + 123 - 0.0123 - 123 = 0.9877
             // seller-alice should have 2 + 123 - 0.0123 = 124.9877
             // forward should have 0.0246
@@ -449,7 +434,7 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             // buyer delivers and settle
             await this.dai.connect(this.bob).mint(deliveryPrice);
             await this.dai.connect(this.bob).approve(this.forward721.address, deliveryPrice)
-            await this.forward721.connect(this.bob).deliver(this.bob.address, 0);
+            await this.forward721.connect(this.bob).deliverFor(this.bob.address, 0);
         }
         let cfee0 = await this.forward721.cfee();
         await expectRevert(this.factory721.connect(this.bob).collectFee(this.alice.address, [0]), "Ownable: caller is not the owner") 
@@ -473,9 +458,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         await this.factory721.connect(this.alice).pausePools([0])
         
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -486,15 +471,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         let order;
         
         await expectRevert(
-            this.forward721.connect(this.alice).createOrder(
+            this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
@@ -507,15 +490,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            const tx = await this.forward721.connect(this.alice).createOrder(
+            const tx = await this.forward721.connect(this.alice).createOrderFor(
             this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
@@ -541,9 +522,9 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         }
 
         let tokenIds = [0, 1];
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
+        let deliveryPeriod = 12 * 3600;
         let deliveryPrice = toWei("100", "ether");
         let buyerMargin = toWei("10", "ether");
         let sellerMargin = toWei("20", "ether");
@@ -553,15 +534,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             // yVault(b:101, t:100), hVault(shares:0, balance:0, totalsupply:0)
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-            await this.forward721.connect(this.alice).createOrder(
+            await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                [orderValidPeriod,
                 nowToDeliverPeriod,
-                deliveryPeriod,
                 deliveryPrice,
                 buyerMargin,
-                sellerMargin],
+                sellerMargin,
                 [],
                 deposit,
                 isSeller
@@ -574,7 +553,7 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             let fVaultPrice;
             {
                 let order = await this.forward721.orders(0);
-                expect(order.seller.share.toString()).to.equal(sellerMargin)
+                expect(order.sellerShare.toString()).to.equal(sellerMargin)
                 await this.fVault.rebase();
                 // yVault(b:101+20*0.8=117, t:117*100/101), hVault(shares:117*100/101-100, b:20, t:20)
                 await this.dai.connect(this.alice).mint(toWei("1"))
@@ -595,10 +574,10 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             {
                 await this.dai.connect(this.bob).mint(buyerMargin);
                 await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-                await this.forward721.connect(this.bob).takeOrder(this.bob.address, 0);
+                await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
                 let hVaultBal = fVaultSupply.mul(fVaultPrice).div(toWeiBN("1"))
                 buyerShare = toBN(buyerMargin).mul(fVaultSupply).div(hVaultBal)
-                expect(equals(toBN((await this.forward721.orders(0)).buyer.share.toString()), buyerShare)).to.equal(true)
+                expect(equals(toBN((await this.forward721.orders(0)).buyerShare.toString()), buyerShare)).to.equal(true)
 
             }
             // Too complex to continue the mathamatic calculation....!

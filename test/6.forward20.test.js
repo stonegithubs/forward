@@ -73,9 +73,8 @@ describe("Forward20 TestCase with marginToken as weth and support forward router
     it("should createOrder and takeOrder correctly", async() => {
         expect(await this.forward20weth.margin()).to.equal(this.weth.address)
         let tokenIds = toWei("10");
-        let orderValidPeriod = 10 * 60;
+        let orderValidPeriod = 7 * 24 * 3600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-        let deliveryPeriod = 10 * 60;
         let deliveryPrice = toWei("123", "ether");
         let buyerMargin = toWei("1", "ether");
         let sellerMargin = toWei("2", "ether");
@@ -87,16 +86,14 @@ describe("Forward20 TestCase with marginToken as weth and support forward router
         {
             console.log("before createOrder, seller ether ballance: ", await web3.eth.getBalance(this.alice.address))
             {
-                const tx = await this.router.connect(this.alice).createOrder20(
+                const tx = await this.router.connect(this.alice).createOrder20For(
                     this.forward20weth.address,
                     this.alice.address,
                     tokenIds,
-                    [orderValidPeriod,
                     nowToDeliverPeriod,
-                    deliveryPeriod,
                     deliveryPrice,
                     buyerMargin,
-                    sellerMargin],
+                    sellerMargin,
                     [],
                     deposit,
                     isSeller,
@@ -107,7 +104,7 @@ describe("Forward20 TestCase with marginToken as weth and support forward router
             
             console.log("before takeOrder, buyer ether ballance: ", await web3.eth.getBalance(this.bob.address))
             {
-                const tx = await this.router.connect(this.bob).takeOrder(this.forward20weth.address, this.bob.address, 0, {value: tokenIds});
+                const tx = await this.router.connect(this.bob).takeOrderFor(this.forward20weth.address, this.bob.address, 0, {value: tokenIds});
             }
             console.log("after takeOrder, buyer ether ballance: ", await web3.eth.getBalance(this.bob.address))
         }
@@ -124,7 +121,7 @@ describe("Forward20 TestCase with marginToken as weth and support forward router
         // await this.want.connect(this.alice).mint(deliveryPrice)
         // await this.want.connect(this.alice).approve(this.forward20.address, deliveryPrice)
         // {
-        //     const tx = await this.forward20.connect(this.alice).deliver(this.alice.address, 0);
+        //     const tx = await this.forward20.connect(this.alice).deliverFor(this.alice.address, 0);
         //     console.log("deliver tx1 is: ", JSON.stringify(tx))
         //     console.log("gasLimit-----deliver----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         // }
@@ -135,7 +132,7 @@ describe("Forward20 TestCase with marginToken as weth and support forward router
         // await this.dai.connect(this.bob).mint(deliveryPrice);
         // await this.dai.connect(this.bob).approve(this.forward20.address, deliveryPrice)
         // {
-        //     const tx = await this.forward20.connect(this.bob).deliver(this.bob.address, 0);
+        //     const tx = await this.forward20.connect(this.bob).deliverFor(this.bob.address, 0);
         //     console.log("deliver tx2 is: ", JSON.stringify(tx))
         //     console.log("gasLimit-----deliver and settle----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
         // }

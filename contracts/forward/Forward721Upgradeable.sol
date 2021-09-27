@@ -25,16 +25,13 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         require(_poolType == 721, "!721");
     }
 
-    function createOrder(
+    function createOrderFor(
         address _creator,
         uint256[] memory _tokenIds, 
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice,
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice,
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -46,15 +43,12 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         }
 
         // create order
-        _createOrder(
+        _createOrderFor(
             _creator,
-            // _orderValidPeriod, 
-            // _nowToDeliverPeriod, 
-            // _deliveryPeriod, 
-            // _deliveryPrice, 
-            // _buyerMargin, 
-            // _sellerMargin,
-            _uintData,
+            _nowToDeliverPeriod, 
+            _deliveryPrice, 
+            _buyerMargin, 
+            _sellerMargin,
             _takerWhiteList, 
             _deposit, 
             _isSeller

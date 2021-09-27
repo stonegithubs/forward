@@ -33,21 +33,21 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     bool public paused;
 
     enum OrderState { inactive, active, filled, dead, delivery, expired, settled }
-    struct Dealer {
-        uint256 margin;
-        uint256 share;
-        address addr;
-        bool delivered;
-    }
+
     struct Order {
+        uint256 buyerMargin;
+        uint256 sellerMargin;
+        uint256 buyerShare;
+        uint256 sellerShare;
         uint256 deliveryPrice;
         uint256 validTill;
         uint256 deliverStart;         // timpstamp
-        uint256 expireStart;          // timestamp
-        Dealer seller;
-        Dealer buyer;
-        address[] takerWhiteList;
+        address buyer;
+        address seller;
         OrderState state;
+        bool buyerDelivered;
+        bool sellerDelivered;
+        address[] takerWhiteList;
     }
     Order[] public orders;
 
@@ -151,8 +151,6 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             if (oldShares > 0) {
                 ratio = tokens.mul(1e18).div(oldShares);
             }
-            
-
         } else {
             revert("nonsense");
         }
@@ -206,10 +204,10 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     
     function getBuyerAmountToDeliver(uint256 _orderId) external virtual view returns (uint256 price) {
         Order memory order = orders[_orderId];        
-        if (!order.buyer.delivered) {
+        if (!order.buyerDelivered) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
-            price = buyerAmount.sub(order.buyer.share.mul(getPricePerFullShare()).div(1e18));
+            price = buyerAmount.sub(order.buyerShare.mul(getPricePerFullShare()).div(1e18));
         }
     }
 
@@ -218,15 +216,12 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         return "v1.0";
     }
     
-    function _createOrder(
+    function _createOrderFor(
         address _creator,
-        // uint _orderValidPeriod, 
-        // uint _nowToDeliverPeriod,
-        // uint _deliveryPeriod,
-        // uint256 _deliveryPrice, 
-        // uint256 _buyerMargin,
-        // uint256 _sellerMargin,
-        uint256[6] memory _uintData,
+        uint _nowToDeliverPeriod,
+        uint256 _deliveryPrice, 
+        uint256 _buyerMargin,
+        uint256 _sellerMargin,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -234,36 +229,26 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         uint _shares;
         if (_deposit && !_isSeller) {
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
-            // uint p = _deliveryPrice.mul(fee.add(base)).div(base);
-            _shares = _pullMargin(_uintData[3].mul(fee.add(base)).div(base), true);
+            _shares = _pullMargin(_deliveryPrice.mul(fee.add(base)).div(base), true);
         } else {
             // take margin from msg.sender normally
-            _shares = _pullMargin(_isSeller ? _uintData[5] : _uintData[4], true);
+            _shares = _pullMargin(_isSeller ? _sellerMargin : _buyerMargin, true);
         }
 
-
-        uint validTill = _getBlockTimestamp().add(_uintData[0] /** _orderValidPeriod */);
-        uint deliverStart = _getBlockTimestamp().add(_uintData[1] /** _nowToDeliverPeriod */);
-        uint expireStart = deliverStart.add(_uintData[2] /** _deliveryPeriod */);
-       
+        (uint _orderValidPeriod, ) = IHogletFactory(factory).getPeriods();
         orders.push(
             Order({
-                buyer: Dealer({
-                    addr: _isSeller ? address(0) : _creator,
-                    margin: _uintData[4],
-                    share: _isSeller ? 0 : _shares,
-                    delivered: _deposit && !_isSeller
-                }),
-                seller: Dealer({
-                    addr: _isSeller ? _creator : address(0),
-                    margin: _uintData[5],
-                    share: _isSeller ? _shares : 0,
-                    delivered: _deposit && _isSeller
-                }),
-                deliveryPrice: _uintData[3] /** _deliveryPrice */,
-                validTill: validTill,
-                deliverStart: deliverStart,
-                expireStart: expireStart,
+                buyer: _isSeller ? address(0) : _creator,
+                buyerMargin: _buyerMargin,
+                buyerShare: _isSeller ? 0 : _shares,
+                buyerDelivered: _deposit && !_isSeller,
+                seller: _isSeller ? _creator : address(0),
+                sellerMargin: _sellerMargin,
+                sellerShare: _isSeller ? _shares : 0,
+                sellerDelivered: _deposit && _isSeller,
+                deliveryPrice: _deliveryPrice,
+                validTill: _getBlockTimestamp().add(_orderValidPeriod),
+                deliverStart: _getBlockTimestamp().add(_nowToDeliverPeriod),
                 state: OrderState.active,
                 takerWhiteList: new address[](0)
             })
@@ -281,12 +266,12 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     }
 
     
-    function takeOrder(address _taker, uint _orderId) external virtual nonReentrant {
+    function takeOrderFor(address _taker, uint _orderId) external virtual nonReentrant {
         _onlyNotPaused();
-        _takeOrder(_taker, _orderId);
+        _takeOrderFor(_taker, _orderId);
     }
 
-    function _takeOrder(address _taker, uint _orderId) internal virtual {
+    function _takeOrderFor(address _taker, uint _orderId) internal virtual {
         // check condition
         require(_orderId < orders.length, "!orderId");
         Order memory order = orders[_orderId];
@@ -296,16 +281,16 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             require(_withinList(_taker, order.takerWhiteList), "!whitelist");
         }
 
-        uint takerMargin = orders[_orderId].seller.addr == address(0) ? orders[_orderId].seller.margin : orders[_orderId].buyer.margin;
+        uint takerMargin = orders[_orderId].seller == address(0) ? orders[_orderId].sellerMargin : orders[_orderId].buyerMargin;
         uint shares = _pullMargin(takerMargin, true);
 
         // change storage
-        if (orders[_orderId].buyer.addr == address(0)) {
-            orders[_orderId].buyer.addr = _taker;
-            orders[_orderId].buyer.share = shares;
-        } else if (orders[_orderId].seller.addr == address(0)) {
-            orders[_orderId].seller.addr = _taker;
-            orders[_orderId].seller.share = shares;
+        if (orders[_orderId].buyer == address(0)) {
+            orders[_orderId].buyer = _taker;
+            orders[_orderId].buyerShare = shares;
+        } else if (orders[_orderId].seller == address(0)) {
+            orders[_orderId].seller = _taker;
+            orders[_orderId].sellerShare = shares;
         } else {
             revert("bug");
         }
@@ -316,29 +301,29 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
     function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual {}
     function _pushUnderingAssetsFromSelf(uint256 _orderId, address _to) internal virtual {}
 
-    function deliver(address _deliverer, uint256 _orderId) external virtual nonReentrant {
+    function deliverFor(address _deliverer, uint256 _orderId) external virtual nonReentrant {
         _onlyNotPaused();
         Order memory order = orders[_orderId];
         require(checkOrderState(_orderId) == OrderState.delivery, "!delivery");
-        require(_deliverer == order.seller.addr || _deliverer == order.buyer.addr, "only seller & buyer");
+        require(_deliverer == order.seller || _deliverer == order.buyer, "only seller & buyer");
 
-        if (_deliverer == order.seller.addr && !order.seller.delivered) {
+        if (_deliverer == order.seller && !order.sellerDelivered) {
             // seller tends to deliver underlyingAssets[_orderId] amount of want tokens
             _pullUnderlyingAssetsToSelf(_orderId);
-            orders[_orderId].seller.delivered = true;
+            orders[_orderId].sellerDelivered = true;
             emit Delivery(_orderId, _deliverer);
         }
-        if (_deliverer == order.buyer.addr && !order.buyer.delivered) {
+        if (_deliverer == order.buyer && !order.buyerDelivered) {
             // buyer tends to deliver tokens
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
             uint buyerAmount = order.deliveryPrice.mul(fee.add(base)).div(base);
             _pullMargin(
                 buyerAmount.sub(
-                    order.buyer.share.mul(getPricePerFullShare()).div(1e18)
+                    order.buyerShare.mul(getPricePerFullShare()).div(1e18)
                 ), 
                 false /* here we do not farm delivered tokens since they just stay in contract for challenge period at most */
             );  
-            orders[_orderId].buyer.delivered = true;
+            orders[_orderId].buyerDelivered = true;
             emit Delivery(_orderId, _deliverer);
         }
 
@@ -358,20 +343,20 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         
         Order memory order = orders[_orderId];
         // in case both sides delivered
-        if (order.seller.delivered && order.buyer.delivered) {
+        if (order.sellerDelivered && order.buyerDelivered) {
             // send buyer underlyingAssets[_orderId] amount of want tokens and seller margin
-            _pushUnderingAssetsFromSelf(_orderId, order.buyer.addr);
+            _pushUnderingAssetsFromSelf(_orderId, order.buyer);
             uint bfee = order.deliveryPrice.mul(fee).div(base);
             // carefully check if there is margin left for buyer in case buyer depositted both margin and deliveryPrice at the very first
-            uint bsa /*Buyer Share token Amount*/ = order.buyer.share.mul(getPricePerFullShare()).div(1e18);
+            uint bsa /*Buyer Share token Amount*/ = order.buyerShare.mul(getPricePerFullShare()).div(1e18);
             // should send extra farmming profit to buyer
             if (bsa > order.deliveryPrice.add(bfee)) {
-                _pushMargin(order.buyer.addr, bsa.sub(order.deliveryPrice).sub(bfee));
+                _pushMargin(order.buyer, bsa.sub(order.deliveryPrice).sub(bfee));
             }
             
             // send seller payout
-            uint sellerAmount = order.seller.share.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
-            _pushMargin(order.seller.addr, sellerAmount);
+            uint sellerAmount = order.sellerShare.mul(getPricePerFullShare()).div(1e18).add(order.deliveryPrice).sub(bfee);
+            _pushMargin(order.seller, sellerAmount);
             cfee = cfee.add(bfee.mul(2));
             
             
@@ -380,25 +365,25 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
             return; // must return here
         }
         if (_forceSettle) {
-            if (!order.seller.delivered) {
+            if (!order.sellerDelivered) {
                 // blame seller if he/she does not deliver nfts  
-                uint sfee = order.seller.margin.mul(fee).div(base);
+                uint sfee = order.sellerMargin.mul(fee).div(base);
                 cfee = cfee.add(sfee);
                 _pushMargin(
-                    order.buyer.addr, 
+                    order.buyer, 
                     /* here we send both buyer and seller's margin to buyer except seller's op fee */
-                    order.buyer.share.add(order.seller.share).mul(getPricePerFullShare()).div(1e18).sub(sfee)
+                    order.buyerShare.add(order.sellerShare).mul(getPricePerFullShare()).div(1e18).sub(sfee)
                 );
-            } else if (!order.buyer.delivered) {
+            } else if (!order.buyerDelivered) {
                 // blame buyer
-                uint bfee = order.buyer.margin.mul(fee).div(base);
+                uint bfee = order.buyerMargin.mul(fee).div(base);
                 cfee = cfee.add(bfee);
                 _pushMargin(
-                    order.seller.addr,
-                    order.seller.share.add(order.buyer.share).mul(getPricePerFullShare()).div(1e18).sub(bfee)
+                    order.seller,
+                    order.sellerShare.add(order.buyerShare).mul(getPricePerFullShare()).div(1e18).sub(bfee)
                 );
                 // return underying assets (underlyingAssets[_orderId] amount of want) to seller
-                _pushUnderingAssetsFromSelf(_orderId, order.seller.addr);
+                _pushUnderingAssetsFromSelf(_orderId, order.seller);
             }
             orders[_orderId].state = OrderState.settled;
             emit Settle(_orderId);
@@ -422,9 +407,10 @@ contract BaseForwardUpgradeable is ReentrancyGuardUpgradeable {
         if (order.validTill == 0 ) return OrderState.inactive;
         uint time = _getBlockTimestamp();
         if (time <= order.validTill) return OrderState.active;
-        if (order.buyer.addr == address(0) || order.seller.addr == address(0)) return OrderState.dead;
+        if (order.buyer == address(0) || order.seller == address(0)) return OrderState.dead;
         if (time <= order.deliverStart) return OrderState.filled;
-        if (time <= order.expireStart) return OrderState.delivery;
+        (, uint _deliveryPeriod ) = IHogletFactory(factory).getPeriods();
+        if (time <= order.deliverStart.add(_deliveryPeriod)) return OrderState.delivery;
         if (order.state != OrderState.settled) return OrderState.expired;
         return OrderState.settled;
     }
