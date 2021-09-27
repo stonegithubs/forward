@@ -35,30 +35,79 @@ async function main() {
         );
         
         // We get the contract to deploy
-        const Forward721Imp = await ethers.getContractFactory(
-            "Forward721Upgradeable"
-        );
-        const forward721Imp = await Forward721Imp.deploy();
-        await forward721Imp.deployed();
-        console.log('forward721 implementation: ', forward721Imp.address)
-        config[network.name].deployed = {
-            "forward721Imp": forward721Imp.address
-        }
-        utils.saveConfig(config);
+        const Dai = await ethers.getContractFactory("MockERC20")
+        const Nft = await ethers.getContractFactory("MockERC721")
+        const WETH = await ethers.getContractFactory("WETH9")
+        const Forward721Imp = await ethers.getContractFactory("Forward721Upgradeable");
+        const Factory721 = await ethers.getContractFactory("Factory721Upgradeable")
+        const Router = await ethers.getContractFactory("ForwardEtherRouter")
 
-        const Factory = await ethers.getContractFactory(
-            "HedgehogFactoryUpgradeable"
-        );
-        factory = await upgrades.deployProxy(
-            Factory,
-            [forward721Imp.address, [config[network.name].dai.address], deployer.address, 10],
-            {
-                initializer: "initialize"
-            }
-        );
-        console.log("HedgehogFactoryUpgradeable: ", factory.address);
-        config[network.name].deployed.factory = factory.address;
-        utils.saveConfig(config);
+        if ( !config[network.name].deployed.hasOwnProperty("weth") || config[network.name].deployed.weth == "") {
+            const weth = await WETH.deploy()
+            await weth.deployed();
+            console.log('deploy weth: ', weth.address)
+            config[network.name].deployed.weth = weth.address
+            utils.saveConfig(config);
+        }
+
+        if ( !config[network.name].deployed.hasOwnProperty("dai") || config[network.name].deployed.dai == "") {
+            const dai = await Dai.deploy("Dai Token", "DAI", 0)
+            await dai.deployed();
+            console.log('deploy dai: ', dai.address)
+            config[network.name].deployed.dai = dai.address
+            utils.saveConfig(config);
+        }
+
+        if (!config[network.name].deployed.hasOwnProperty("nft") || config[network.name].deployed.nft == "") {
+            const nft = await Nft.deploy("First Nft", "FNFT")
+            await nft.deployed()
+            console.log('deploy nft: ', nft.address)
+            config[network.name].deployed.nft = nft.address
+            utils.saveConfig(config);
+        }
+
+        if (!config[network.name].deployed.hasOwnProperty("router") || config[network.name].deployed.router == "") {
+            const router = await Router.deploy(config[network.name].deployed.weth);
+            await router.deployed()
+            console.log('deploy router: ', router.address)
+            config[network.name].deployed.router = router.address
+            utils.saveConfig(config);
+        }
+
+        if (!config[network.name].deployed.hasOwnProperty("forward721Imp") || config[network.name].deployed.forward721Imp == "") {
+            const forward721Imp = await Forward721Imp.deploy();
+            await forward721Imp.deployed();
+            console.log('deploy forward721Imp: ', forward721Imp.address)
+            config[network.name].deployed.forward721Imp = forward721Imp.address
+            utils.saveConfig(config);
+        }
+
+
+        if (!config[network.name].deployed.hasOwnProperty("factory721") || config[network.name].deployed.factory721 == "") {
+            const factory721 = await upgrades.deployProxy(
+                Factory721,
+                [
+                    config[network.name].deployed.forward721Imp, 
+                    [config[network.name].deployed.dai, config[network.name].deployed.weth], 
+                    deployer.address, 
+                    10/* 10 /10000 */
+                ],
+                {
+                    initializer: "__FactoryUpgradeable__init"
+                }
+            );
+            console.log('deploy factory721: ', factory721.address)
+            config[network.name].deployed.factory721 = factory721.address
+            utils.saveConfig(config);
+        }
+
+        const factory721 = await Factory721.attach(config[network.name].deployed.factory721);
+        await factory721.connect(deployer).deployPool(config[network.name].deployed.nft, 721, config[network.name].deployed.dai)
+        await factory721.connect(deployer).deployPool(config[network.name].deployed.nft, 721, config[network.name].deployed.weth)
+
+        // const forward721 = await Forward721Imp.attach(config[network.name].deployed.forward721);
+
+
 
     } else {
         throw("not deployed due to wrong network")
