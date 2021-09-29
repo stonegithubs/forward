@@ -98,7 +98,6 @@ describe("Forward20 TestCase with marginToken and GasTest", function() {
                     deliveryPrice,
                     buyerMargin,
                     sellerMargin,
-                    [],
                     deposit,
                     isSeller
                 );

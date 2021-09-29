@@ -7,13 +7,16 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@codechecks/client": "^0.1.11",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.6",
     "@nomiclabs/hardhat-truffle5": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.13",
+    "@openzeppelin/truffle-upgrades": "^1.9.1",
     "chai": "^4.3.4",
     "ethers": "^5.4.6",
     "hardhat": "^2.6.4",
+    "hardhat-gas-reporter": "^1.0.4",
     "web3": "^1.5.2"
   },
   "dependencies": {

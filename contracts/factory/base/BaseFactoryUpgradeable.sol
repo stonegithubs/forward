@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "../../proxy/beacon/UpgradeableBeacon.sol";
 import "../../proxy/beacon/BeaconProxy.sol";
 import "../../interface/IHogletFactory.sol";
+import "../../interface/IBaseForward.sol";
 import "../../proxy/Clones.sol";
 import "../../forward/Forward721Upgradeable.sol";
 import "../../forward/Forward20Upgradeable.sol";
@@ -103,7 +104,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     }
 
     function setForwardVault(uint256 _poolId, address _forwardVault) external virtual onlyOwner {
-        Forward721Upgradeable(allPairs[_poolId]).setForwardVault(_forwardVault);
+        IBaseForward(allPairs[_poolId]).setForwardVault(_forwardVault);
     }
 
     function ifMarginSupported(address _token) public view virtual override returns (bool) {

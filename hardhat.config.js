@@ -2,6 +2,7 @@
 require("@openzeppelin/hardhat-upgrades");
 require("@nomiclabs/hardhat-etherscan");
 require('@nomiclabs/hardhat-truffle5');
+require("hardhat-gas-reporter");
 
 /** In order to compile and verify using any specific solcjs version, we can use the following 
      referring to : https://github.com/fvictorio/hardhat-examples/tree/master/custom-solc
@@ -62,6 +63,10 @@ module.exports = {
       url: `https://ropsten.infura.io/v3/${config.ropsten.infuraKey}`,
       accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
     },
+    kovan:  {
+      url: `https://ropsten.infura.io/v3/${config.kovan.infuraKey}`,
+      accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
+    },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${config.ropsten.infuraKey}`,
       accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
@@ -103,7 +108,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true, // true for release, false is default for debug and test
-            runs: 1000,
+            runs: 200,
           },
         },
       },
@@ -119,4 +124,14 @@ module.exports = {
     ]
     
   },
+  gasReporter: {
+    enabled: (`${config.etherScanApiKey}`) ? true : false,
+    showMethodSig: true,
+    rst: true,
+    onlyCalledMethods: true,
+    src:"./contracts/forward",
+    // proxyResolver: "implementation()", // (address _creator,uint _underlyingAmount, uint _orderValidPeriod,uint _deliveryStart,uint _deliveryPeriod,uint _deliveryPrice,uint _buyerMargin,uint _sellerMargin,bool _deposit,bool _isSeller)
+    coinmarketcap: `${config.etherScanApiKey}`,
+    currency: "USD",
+  }
 };

@@ -7,11 +7,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/IERC1155Upgradeable.so
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "./base/BaseForwardUpgradeable.sol";
+import "./base/BaseForwardUpgradeableV2.sol";
 import "../interface/IHogletFactory.sol";
 import "../interface/IForwardVault.sol";
 
-contract Forward1155Upgradeable is BaseForwardUpgradeable {
+contract Forward1155UpgradeableV2 is BaseForwardUpgradeableV2, ERC1155HolderUpgradeable {
     using SafeMathUpgradeable for uint256;
     
     struct Asset {
@@ -41,15 +41,18 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         address _creator,
         uint256[] memory _ids,
         uint256[] memory _amounts,
-        uint _orderValidPeriod,
-        uint _deliveryStart,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod,
+        // uint _deliveryStart,
+        // uint _deliveryPeriod,
+        uint[] memory _times,
+        // uint _deliveryPrice, 
+        // uint _buyerMargin,
+        // uint _sellerMargin,
+        uint[] memory _prices,
+        address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external  {
+    ) external nonReentrant {
         _onlyNotPaused();
         require(_ids.length == _amounts.length, "!len");
         // check if msg.sender wants to deposit _underlyingAmount amount of want directly
@@ -60,13 +63,16 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
         // create order
         _createOrderFor(
             _creator,
-            _orderValidPeriod,
-            _deliveryStart, 
-            _deliveryPeriod,
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
-            _deposit,
+            // _orderValidPeriod,
+            // _deliveryStart, 
+            // _deliveryPeriod,
+            _times,
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _prices,
+            _takerWhiteList, 
+            _deposit, 
             _isSeller
         );
         underlyingAssets_.push(
@@ -76,8 +82,8 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable {
             })
         );
         for (uint i = 0; i < _ids.length; i++) {
-            underlyingAssets_[ordersLength - 1].ids.push(_ids[i]);
-            underlyingAssets_[ordersLength - 1].amounts.push(_amounts[i]);
+            underlyingAssets_[underlyingAssets_.length - 1].ids.push(_ids[i]);
+            underlyingAssets_[underlyingAssets_.length - 1].amounts.push(_amounts[i]);
         }
     }
 

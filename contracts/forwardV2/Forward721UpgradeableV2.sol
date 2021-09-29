@@ -6,10 +6,10 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "./base/BaseForwardUpgradeable.sol";
+import "./base/BaseForwardUpgradeableV2.sol";
 import "../interface/IHogletFactory.sol";
 
-contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeable {
+contract Forward721UpgradeableV2 is BaseForwardUpgradeableV2, ERC721HolderUpgradeable {
 
     using SafeMathUpgradeable for uint256;
 
@@ -28,15 +28,18 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     function createOrderFor(
         address _creator,
         uint256[] memory _tokenIds, 
-        uint _orderValidPeriod,
-        uint _deliveryStart,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        // uint _orderValidPeriod,
+        // uint _deliveryStart,
+        // uint _deliveryPeriod,
+        uint[] memory _times,
+        // uint _deliveryPrice, 
+        // uint _buyerMargin,
+        // uint _sellerMargin,
+        uint[] memory _prices,
+        address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external {
+    ) external nonReentrant {
         _onlyNotPaused();
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
@@ -46,13 +49,16 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         // create order
         _createOrderFor(
             _creator,
-            _orderValidPeriod,
-            _deliveryStart, 
-            _deliveryPeriod,
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
-            _deposit,
+            // _orderValidPeriod,
+            // _deliveryStart, 
+            // _deliveryPeriod,
+            _times,
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _prices,
+            _takerWhiteList, 
+            _deposit, 
             _isSeller
         );
         uint curOrderIndex = ordersLength - 1;

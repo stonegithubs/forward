@@ -32,7 +32,7 @@ describe("Vault", function () {
 
 
         const ForwardVaultUpgradeable = await ethers.getContractFactory(
-            "ForwardVaultUpgradeable"
+            "ForwardVaultUpgradeableV2"
         );
         this.fVault = await upgrades.deployProxy(
             ForwardVaultUpgradeable,
