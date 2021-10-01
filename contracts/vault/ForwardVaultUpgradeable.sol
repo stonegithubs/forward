@@ -16,9 +16,9 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
     IYearnYVault public yVault;
     IERC20Upgradeable public want;
     
-    uint256 public min;
-    uint256 public tolerance; // rebase tolerance for suitable
-    uint256 public constant max = 10000;
+    uint public min;
+    uint public tolerance; // rebase tolerance for suitable
+    uint public constant max = 10000;
 
     address public governance;
     
@@ -28,8 +28,8 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         address _want,
         address _yVault,
         address _governance,
-        uint256 _min,
-        uint256 _tolerance
+        uint _min,
+        uint _tolerance
     ) public initializer {
         __ERC20_init(
             string(abi.encodePacked("hoglet forward vault ", ERC20Upgradeable(_want).name())),
@@ -38,22 +38,22 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         want = IERC20Upgradeable(_want);
         governance = _governance;
         yVault = IYearnYVault(_yVault);
-        want.safeApprove(_yVault, type(uint256).max);
+        want.safeApprove(_yVault, type(uint).max);
         require(_min < max && _tolerance < max, "!min or !tolerance");
         min = _min;
         tolerance = _tolerance;
     }
 
-    function balance() public view returns (uint256) {
+    function balance() public view returns (uint) {
         return want.balanceOf(address(this)).add(
             balanceSavingsInYVault()
         );
     }
-    function balanceSavingsInYVault() public view returns (uint256) {
+    function balanceSavingsInYVault() public view returns (uint) {
         return yVault.balanceOf(address(this)).mul(yVault.getPricePerFullShare()).div(1e18);
     }
 
-    function setMinTolerance(uint256 _min, uint256 _tolerance) public {
+    function setMinTolerance(uint _min, uint _tolerance) public {
         require(msg.sender == governance, "!governance");
         require(_min < max, "!min");
         require(_tolerance < max, "!tolerance");
@@ -70,15 +70,15 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
     }
 
     // suitable for farming on yearn.finance
-    function suitable() public view returns (uint256) {
+    function suitable() public view returns (uint) {
         return balance().mul(min).div(max);
     }
 
 
     function rebase() public {
-        uint256 _real = balanceSavingsInYVault();
-        uint256 _suit = suitable();
-        uint256 _diff = _real < _suit ? _suit.sub(_real) : _real.sub(_suit);
+        uint _real = balanceSavingsInYVault();
+        uint _suit = suitable();
+        uint _diff = _real < _suit ? _suit.sub(_real) : _real.sub(_suit);
         require(_diff >= _suit.mul(tolerance).div(max), "!diff");
         if (_real < _suit) {
             yVault.deposit(_diff);
@@ -89,13 +89,13 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         }
     }
 
-    function deposit(uint256 _amount) public returns (uint256) {
-        uint256 _pool = balance();
-        uint256 _before = want.balanceOf(address(this));
+    function deposit(uint _amount) public returns (uint) {
+        uint _pool = balance();
+        uint _before = want.balanceOf(address(this));
         want.safeTransferFrom(msg.sender, address(this), _amount);
-        uint256 _after = want.balanceOf(address(this));
+        uint _after = want.balanceOf(address(this));
         _amount = _after.sub(_before); // Additional check for deflationary tokens
-        uint256 shares = 0;
+        uint shares = 0;
         if (totalSupply() == 0) {
             shares = _amount;
         } else {
@@ -105,23 +105,23 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         return shares;
     }
 
-    function depositAll() external returns (uint256) {
+    function depositAll() external returns (uint) {
         return deposit(want.balanceOf(msg.sender));
     }
     
 
-    function withdraw(uint256 _shares) public returns (uint256) {
-        uint256 r = (balance().mul(_shares)).div(totalSupply());
+    function withdraw(uint _shares) public returns (uint) {
+        uint r = (balance().mul(_shares)).div(totalSupply());
         _burn(msg.sender, _shares);
 
         // Check balance
-        uint256 b = want.balanceOf(address(this));
+        uint b = want.balanceOf(address(this));
         if (b < r) {
-            uint256 _withdraw = r.sub(b);
-            uint256 _wshare = _withdraw.mul(1e18).div(yVault.getPricePerFullShare());
+            uint _withdraw = r.sub(b);
+            uint _wshare = _withdraw.mul(1e18).div(yVault.getPricePerFullShare());
             yVault.withdraw(_wshare);
-            uint256 _after = want.balanceOf(address(this));
-            uint256 _diff = _after.sub(b);
+            uint _after = want.balanceOf(address(this));
+            uint _diff = _after.sub(b);
             if (_diff < _withdraw) {
                 r = b.add(_diff);
             }
@@ -131,11 +131,11 @@ contract ForwardVaultUpgradeable is ERC20Upgradeable {
         return r;
     }
 
-    function withdrawAll() external returns (uint256) {
+    function withdrawAll() external returns (uint) {
         return withdraw(balanceOf(msg.sender));
     }
 
-    function getPricePerFullShare() public view returns (uint256) {
+    function getPricePerFullShare() public view returns (uint) {
         uint supply = totalSupply();
         return supply == 0 ? 1e18 : balance().mul(1e18).div(supply);
     }

@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import "../library/TransferHelper.sol";
 
 interface IWETH {
 
@@ -32,6 +33,26 @@ interface IBaseForward {
 
     function margin() external view returns (address);
     function want() external view returns (address);
+    enum State { inactive, active, filled, dead, delivery, expired, settled, canceled}
+    struct Order {
+        // using uint128 can help save 50k gas
+        uint128 buyerMargin;
+        uint128 sellerMargin;
+        uint128 buyerShare;
+        uint128 sellerShare;
+        uint128 deliveryPrice;
+        uint40 validTill;
+        uint40 deliverStart;         // timpstamp
+        uint40 expireStart;
+        address buyer;
+        address seller;
+        bool buyerDelivered;
+        bool sellerDelivered;
+        State state;
+        address[] takerWhiteList;
+    }
+    function getOrder(uint _orderId) external view returns (Order memory);
+
 }
 
 interface IForward20 is IBaseForward {
@@ -50,6 +71,7 @@ interface IForward20 is IBaseForward {
         bool _deposit,
         bool _isSeller
     ) external;
+    function underlyingAssets(uint _orderId) external view returns (uint amount);
 }
 
 interface IForward721 is IBaseForward {
@@ -68,6 +90,7 @@ interface IForward721 is IBaseForward {
         bool _deposit,
         bool _isSeller
     ) external;
+    function underlyingAssets(uint _orderId) external view returns (uint[] memory ids);
 }
 
 interface IForward1155 is IBaseForward {
@@ -87,11 +110,13 @@ interface IForward1155 is IBaseForward {
         bool _deposit,
         bool _isSeller
     ) external;
+    function underlyingAssets(uint _orderId) external view returns (uint[] memory ids, uint[] memory amounts);
 }
 
-contract ForwardEtherRouter2 {
+contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
     using SafeERC20 for IERC20;
     IWETH public weth;
+
     constructor(address _weth) {
         weth = IWETH(_weth);
     }
@@ -187,7 +212,14 @@ contract ForwardEtherRouter2 {
         // }
         // above equals below on condition that want != margin
         if (_deposit && _isSeller) {
-            // TODO: transfer _tokenIds 721 asset into address(this) then approve to forward721
+            // transfer _tokenIds 721 asset into address(this) then approve to forward721
+            address want = IForward721(_forward721).want();
+            for (uint i = 0; i < _tokenIds.length; i++) {
+                TransferHelper._pullERC721(want, msg.sender, address(this), _tokenIds[i]);
+                // approve erc721 _tokenIds to forward721
+                TransferHelper._approveERC721(want, address(this), _forward721, _tokenIds[i]);
+            }
+
         }
 
         IForward721(_forward721).createOrderFor(
@@ -229,23 +261,25 @@ contract ForwardEtherRouter2 {
         bool _isSeller
     ) external payable {
         require(IForward1155(_forward1155).margin() == address(weth), "margin not weth");
+        require(_ids.length == _amounts.length, "!length");
         weth.deposit{value: msg.value}();
         uint allowance = weth.allowance(address(this), _forward1155);
         if (allowance == 0) {
             weth.approve(_forward1155, type(uint).max);
         }
 
-        // if (_deposit) {
-        //     if (_isSeller) {
-        //         // transfer _tokenIds 1155 asset into address(this)
-        //         // approve these _tokenIds 721 asset to forward1155
-        //     } else {
-        //         // nothing to do since weth approved to forward1155
-        //     }
-        // }
-        // above equals below on condition that want != margin
         if (_deposit && _isSeller) {
-            // TODO: transfer _tokenIds 1155 asset into address(this) then approve to forward1155
+            // transfer _tokenIds 1155 asset into address(this) then approve to forward1155
+            address want = IForward1155(_forward1155).want();
+            IERC1155(want).safeBatchTransferFrom(
+                msg.sender,
+                address(this), 
+                _ids,
+                _amounts,
+                ""
+            );
+            // set approval for all 1155
+            if (!IERC1155(want).isApprovedForAll(address(this), _forward1155)) IERC1155(want).setApprovalForAll(_forward1155, true);
         }
 
         IForward1155(_forward1155).createOrderFor(
@@ -301,8 +335,11 @@ contract ForwardEtherRouter2 {
         require(IForward20(_forward).margin() == address(weth), "margin not weth");
         weth.deposit{value: msg.value}();
 
-        // not consider how seller should deliver, also, how seller deposit asset token like 20, 721, 1155 
-        // TODO: take 20, 721, 1155 underlying assets from msg.sender, then approve them to forward contract
+        // Won't consider how seller should deliver, also, how seller deposit asset token like 20, 721, 1155 
+        // Instead that we take 20, 721, 1155 underlying assets from msg.sender, then approve them to forward contract
+        // we only support ether buyer's delivery, seller can interact with forward directly to save gas
+        IBaseForward.Order memory order = IBaseForward(_forward).getOrder(_orderId);
+        require(_deliverer == order.buyer, "seller can interact with forward directly"); 
 
         IBaseForward(_forward).deliverFor(_deliverer, _orderId);
 

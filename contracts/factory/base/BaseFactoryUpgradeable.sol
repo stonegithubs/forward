@@ -130,7 +130,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     ) external virtual {
         require(poolDeployer == address(0) || msg.sender == poolDeployer, "!poolDeployer");
         require(getPair[_asset][_margin] == address(0), "pool exist"); // single check is sufficient
-        require(_margin != address(0), "ether as margin not support");
+        require(_margin != address(0) && _asset != address(0), "!weth");
         /**
         Do use Method 1 since when we upgrade the imp, all the pairs' logic will follow the new one
         Method 1: deploy new beacon proxy

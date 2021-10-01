@@ -3,9 +3,11 @@
 pragma solidity ^0.8.0;
 
 // ERC721
+
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "./base/BaseForwardUpgradeable.sol";
 import "../interface/IHogletFactory.sol";
+import "../library/TransferHelper.sol";
 
 contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeable {
 
@@ -85,60 +87,14 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
 
     function _pull721TokensToSelf(uint[] memory _tokenIds) internal {
         for (uint i = 0; i < _tokenIds.length; i++) {
-            _pullERC721(want, _tokenIds[i]);
+            TransferHelper._pullERC721(want, msg.sender, address(this), _tokenIds[i]);
         }
     }
 
     function _push721FromSelf(uint[] memory tokenIds, address to) internal {
         for (uint i = 0; i < tokenIds.length; i++) {
-            _pushERC721(want, to, tokenIds[i]);
+            TransferHelper._pushERC721(want, address(this), to, tokenIds[i]);
         }
     }
-
-    // Non-standard ERC721 projects:  https://docs.niftex.org/general/supported-nfts
-    // implementation refers to: https://github.com/NFTX-project/nftx-protocol-v2/blob/master/contracts/solidity/NFTXVaultUpgradeable.sol#L444
-    // TODO: improve implemention to include more non-standard ERC721 impl and change standard to safe-(invoke) way
-    function _pushERC721(address assetAddr, address to, uint256 tokenId) internal virtual {
-        address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
-        address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-        bytes memory data;
-        if (assetAddr == kitties) {
-            // Changed in v1.0.4.
-            data = abi.encodeWithSignature("transfer(address,uint256)", to, tokenId);
-        } else if (assetAddr == punks) {
-            // CryptoPunks.
-            data = abi.encodeWithSignature("transferPunk(address,uint256)", to, tokenId);
-        } else {
-            // Default.
-            data = abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", address(this), to, tokenId);
-        }
-        (bool success,) = address(assetAddr).call(data);
-        require(success);
-    }
-
-    function _pullERC721(address assetAddr, uint256 tokenId) internal virtual {
-        address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
-        address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-        bytes memory data;
-        if (assetAddr == kitties) {
-            // Cryptokitties.
-            data = abi.encodeWithSignature("transferFrom(address,address,uint256)", msg.sender, address(this), tokenId);
-        } else if (assetAddr == punks) {
-            // CryptoPunks.
-            // Fix here for frontrun attack. Added in v1.0.2.
-            bytes memory punkIndexToAddress = abi.encodeWithSignature("punkIndexToAddress(uint256)", tokenId);
-            (bool checkSuccess, bytes memory result) = address(assetAddr).staticcall(punkIndexToAddress);
-            (address owner) = abi.decode(result, (address));
-            require(checkSuccess && owner == msg.sender, "Not the owner");
-            data = abi.encodeWithSignature("buyPunk(uint256)", tokenId);
-        } else {
-            // Default.
-            data = abi.encodeWithSignature("safeTransferFrom(address,address,uint256)", msg.sender, address(this), tokenId);
-        }
-        (bool success, bytes memory resultData) = address(assetAddr).call(data);
-        require(success, string(resultData));
-    }
-
-
 
 }

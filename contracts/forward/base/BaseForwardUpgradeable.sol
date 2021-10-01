@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
+pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
@@ -245,6 +245,9 @@ contract BaseForwardUpgradeable is Initializable {
         return State.settled; // can only be settled
     }
 
+    function getOrder(uint _orderId) external virtual view returns (Order memory order) {
+        order = orders[_orderId];
+    }
     function version() external virtual view returns (string memory) {
         return "v1.0";
     }

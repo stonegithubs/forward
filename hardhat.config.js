@@ -112,14 +112,9 @@ module.exports = {
           },
         },
       },
+
       {
-        version: "0.4.18",
-        settings: {
-          optimizer: {
-            enabled: true, // for weth when testing
-            runs: 200,
-          },
-        },
+        version: "0.4.25",
       }
     ]
     
