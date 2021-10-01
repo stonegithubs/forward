@@ -77,13 +77,12 @@ describe("Forward20 TestCase with marginToken", function() {
             baseGasConsumed = tx.gasLimit;
         }
 
-        let tokenIds = toWei("10");
+        let amounts = toWei("10");
         let orderValidPeriod = 600;
         let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
         let now = (await time.latest()).toNumber();
 
         console.log("now = ", now)
-        console.log("_getBlockTimestamp() = ", (await this.forward20._getBlockTimestamp()).toString())
         let deliveryStart = now + nowToDeliverPeriod;
         let deliveryPeriod = 600;
         let deliveryPrice = toWei("123", "ether");
@@ -101,13 +100,14 @@ describe("Forward20 TestCase with marginToken", function() {
             {
                 const tx = await this.forward20.connect(this.alice).createOrderFor(
                     this.alice.address,
-                    tokenIds,
-                    orderValidPeriod,
+                    amounts,
+                    [orderValidPeriod,
                     deliveryStart,
-                    deliveryPeriod,
-                    deliveryPrice,
+                    deliveryPeriod],
+                    [deliveryPrice,
                     buyerMargin,
-                    sellerMargin,
+                    sellerMargin],
+                    [],
                     deposit,
                     isSeller
                 );

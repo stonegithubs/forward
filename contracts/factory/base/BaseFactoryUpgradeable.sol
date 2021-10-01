@@ -131,23 +131,15 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         require(poolDeployer == address(0) || msg.sender == poolDeployer, "!poolDeployer");
         require(getPair[_asset][_margin] == address(0), "pool exist"); // single check is sufficient
         require(_margin != address(0), "ether as margin not support");
-        
-        // if (_poolType == 721) {
-        //     // Do use Method 1 since when we upgrade the imp, all the pairs' logic will follow the new one
-        //     // Method 1: deploy new beacon proxy
-        //     address beaconProxyAddr = address(new BeaconProxy(address(this), ""));
+        /**
+        Do use Method 1 since when we upgrade the imp, all the pairs' logic will follow the new one
+        Method 1: deploy new beacon proxy
+        address beaconProxyAddr = address(new BeaconProxy(address(this), ""));
 
-        //     // // Method 2: Do NOT use this method since we need to upgrade pairs logic one by one
-        //     // bytes32 salt = keccak256(abi.encodePacked(_asset, _poolType, _margin));
-        //     // beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
-            
-        //     Forward721Upgradeable(beaconProxyAddr).__Forward721__init(_asset, _poolType, _margin);
-
-        // } else if (_poolType == 20) {
-        //     revert("!support");
-        // } else if (_poolType == 1155) {
-
-        // }
+        Method 2: Do NOT use this method since we need to upgrade pairs logic one by one
+        bytes32 salt = keccak256(abi.encodePacked(_asset, _poolType, _margin));
+        beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
+        */
         address beaconProxyAddr = _deployPool(_asset, _poolType, _margin);
 
         allPairs.push(beaconProxyAddr);

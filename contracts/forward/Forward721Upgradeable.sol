@@ -4,17 +4,13 @@ pragma solidity ^0.8.0;
 
 // ERC721
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "./base/BaseForwardUpgradeable.sol";
 import "../interface/IHogletFactory.sol";
 
 contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeable {
 
-    using SafeMathUpgradeable for uint256;
-
     // orderId => tokenIds
-    mapping(uint256 => uint256[]) public underlyingAssets;
+    mapping(uint => uint[]) public underlyingAssets;
 
     function __Forward721Upgradeable__init(
         address _want,
@@ -27,32 +23,38 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
 
     function createOrderFor(
         address _creator,
-        uint256[] memory _tokenIds, 
-        uint _orderValidPeriod,
-        uint _deliveryStart,
-        uint _deliveryPeriod,
-        uint256 _deliveryPrice,
-        uint256 _buyerMargin,
-        uint256 _sellerMargin,
+        uint[] memory _tokenIds, 
+        // uint _orderValidPeriod,
+        // uint _deliveryStart,
+        // uint _deliveryPeriod,
+        uint[] memory _times,
+        // uint _deliveryPrice, 
+        // uint _buyerMargin,
+        // uint _sellerMargin,
+        uint[] memory _prices,
+        address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
     ) external {
         _onlyNotPaused();
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
-            _multiDeposit721(_tokenIds);
+            _pull721TokensToSelf(_tokenIds);
         }
 
         // create order
         _createOrderFor(
             _creator,
-            _orderValidPeriod,
-            _deliveryStart, 
-            _deliveryPeriod,
-            _deliveryPrice, 
-            _buyerMargin, 
-            _sellerMargin,
-            _deposit,
+            // _orderValidPeriod,
+            // _deliveryStart, 
+            // _deliveryPeriod,
+            _times,
+            // _deliveryPrice, 
+            // _buyerMargin, 
+            // _sellerMargin,
+            _prices,
+            _takerWhiteList, 
+            _deposit, 
             _isSeller
         );
         uint curOrderIndex = ordersLength - 1;
@@ -66,12 +68,12 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     * @dev only maker or taker from orderId's order can invoke this method during challenge period
     * @param _orderId the order msg.sender wants to deliver
      */
-    function _pullUnderlyingAssetsToSelf(uint256 _orderId) internal virtual override {
-        _multiDeposit721(underlyingAssets[_orderId]);
+    function _pullUnderlyingAssetsToSelf(uint _orderId) internal virtual override {
+        _pull721TokensToSelf(underlyingAssets[_orderId]);
     }
 
-    function _pushUnderingAssetsFromSelf(uint256 _orderId, address _to) internal virtual override {
-        _multiWithdraw721(underlyingAssets[_orderId], _to);
+    function _pushUnderlyingAssetsFromSelf(uint _orderId, address _to) internal virtual override {
+        _push721FromSelf(underlyingAssets[_orderId], _to);
     }
     
 
@@ -81,20 +83,17 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     }
 
 
-    function _multiDeposit721(uint256[] memory _tokenIds) internal {
+    function _pull721TokensToSelf(uint[] memory _tokenIds) internal {
         for (uint i = 0; i < _tokenIds.length; i++) {
             _pullERC721(want, _tokenIds[i]);
         }
     }
 
-    function _multiWithdraw721(uint256[] memory tokenIds, address to) internal {
+    function _push721FromSelf(uint[] memory tokenIds, address to) internal {
         for (uint i = 0; i < tokenIds.length; i++) {
             _pushERC721(want, to, tokenIds[i]);
         }
     }
-
-
-
 
     // Non-standard ERC721 projects:  https://docs.niftex.org/general/supported-nfts
     // implementation refers to: https://github.com/NFTX-project/nftx-protocol-v2/blob/master/contracts/solidity/NFTXVaultUpgradeable.sol#L444
@@ -139,4 +138,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         (bool success, bytes memory resultData) = address(assetAddr).call(data);
         require(success, string(resultData));
     }
+
+
+
 }

@@ -86,12 +86,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         await this.forward721.connect(this.alice).createOrderFor(
             this.alice.address,
             tokenIds,
-            orderValidPeriod,
+            [orderValidPeriod,
             deliverStart.toString(),
-            deliveryPeriod,
-            deliveryPrice,
+            deliveryPeriod],
+            [deliveryPrice,
             buyerMargin,
-            sellerMargin,
+            sellerMargin],
+            [],
             deposit,
             isSeller
         );
@@ -139,12 +140,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -183,12 +185,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -221,12 +224,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -285,12 +289,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -343,12 +348,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -407,12 +413,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -478,12 +485,13 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             this.forward721.connect(this.alice).createOrderFor(
                 this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             ),
@@ -496,14 +504,15 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
             await this.dai.connect(this.alice).mint(sellerMargin);
             await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
             const tx = await this.forward721.connect(this.alice).createOrderFor(
-            this.alice.address,
+                this.alice.address,
                 tokenIds,
-                orderValidPeriod,
+                [orderValidPeriod,
                 now.toNumber() + nowToDeliverPeriod,
-                deliveryPeriod,
-                deliveryPrice,
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
                 isSeller
             );
@@ -511,86 +520,88 @@ describe("Forward721 TestCase with marginToken as ERC20", function() {
         }
         expect((await this.forward721.ordersLength()).toString()).to.equal("1")    
     })
-    // it("Should takeOrder, deliver, settle correctly if hVault is enabled", async() => {
-    //     {
-    //         await expectRevert(this.forward721.connect(this.bob).setForwardVault(this.fVault.address), "!factory") 
-    //         await this.factory721.connect(this.alice).setForwardVault(0, this.fVault.address)
-    //         // to avoid yVault's raising error from getPricePerFullShare due to dividing by zero, we deposit to yVault
-    //         await this.dai.connect(this.alice).mint(toWei("100"))
-    //         await this.dai.connect(this.alice).approve(this.yVault.address, toWei("100"))
-    //         await this.yVault.deposit(toWei("100"))
-    //         // yVault(b:100, t:100)
-    //         expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(toWei("1", "ether"))
-    //         await this.dai.connect(this.alice).mint(toWei("1"))
-    //         await this.dai.connect(this.alice).transfer(this.yVault.address, toWei("1"))
-    //         expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(toWei("1.01", "ether"))
-    //         // yVault(b:101, t:100)
-    //     }
+    it("Should takeOrder, deliver, settle correctly if hVault is enabled", async() => {
+        {
+            await expectRevert(this.forward721.connect(this.bob).setForwardVault(this.fVault.address), "!factory") 
+            await this.factory721.connect(this.alice).setForwardVault(0, this.fVault.address)
+            // to avoid yVault's raising error from getPricePerFullShare due to dividing by zero, we deposit to yVault
+            await this.dai.connect(this.alice).mint(toWei("100"))
+            await this.dai.connect(this.alice).approve(this.yVault.address, toWei("100"))
+            await this.yVault.deposit(toWei("100"))
+            // yVault(b:100, t:100)
+            expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(toWei("1", "ether"))
+            await this.dai.connect(this.alice).mint(toWei("1"))
+            await this.dai.connect(this.alice).transfer(this.yVault.address, toWei("1"))
+            expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(toWei("1.01", "ether"))
+            // yVault(b:101, t:100)
+        }
 
-    //     let tokenIds = [0, 1];
-    //     let orderValidPeriod = 7 * 24 * 3600;
-    //     let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-    //     let deliveryPeriod = 12 * 3600;
-    //     let deliveryPrice = toWei("100", "ether");
-    //     let buyerMargin = toWei("10", "ether");
-    //     let sellerMargin = toWei("20", "ether");
-    //     let deposit = false;
-    //     let isSeller = true;
-    //     {
-    //         // yVault(b:101, t:100), hVault(shares:0, balance:0, totalsupply:0)
-    //         await this.dai.connect(this.alice).mint(sellerMargin);
-    //         await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
-    //         await this.forward721.connect(this.alice).createOrderFor(
-    //             this.alice.address,
-    //             tokenIds,
-    //             orderValidPeriod,
-    //             now.toNumber() + nowToDeliverPeriod,
-    //             deliveryPeriod,
-    //             deliveryPrice,
-    //             buyerMargin,
-    //             sellerMargin,
-    //             deposit,
-    //             isSeller
-    //         );
-    //         // add profits to yVault
-    //         let yVaultPrice;
-    //         let yVaultSupply;
-    //         let hVaultSharesInY;
-    //         let fVaultSupply;
-    //         let fVaultPrice;
-    //         {
-    //             let order = await this.forward721.orders(0);
-    //             expect(order.sellerShare.toString()).to.equal(sellerMargin)
-    //             await this.fVault.rebase();
-    //             // yVault(b:101+20*0.8=117, t:117*100/101), hVault(shares:117*100/101-100, b:20, t:20)
-    //             await this.dai.connect(this.alice).mint(toWei("1"))
-    //             await this.dai.connect(this.alice).transfer(this.yVault.address, toWei("1"))
-    //             // yVault(b:118, t:117*100/101), hVault(s:117*100/101-100, b:h.s/y.b*y.t + 4, t:20)
-    //             yVaultSupply = toWeiBN("117").mul(toWeiBN("100")).div(toWeiBN("101"))
-    //             yVaultPrice = toWeiBN("118").mul(toWeiBN("101")).mul(toWeiBN("1")).div(toWeiBN("117")).div(toWeiBN("100"))
-    //             expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(yVaultPrice.toString())
-    //             hVaultSharesInY = toWeiBN("117").mul(toWeiBN("100")).div(toWeiBN("101")).sub(toWeiBN("100"))
-    //             expect((await this.yVault.balanceOf(this.fVault.address)).toString()).to.equal(hVaultSharesInY.toString())
-    //             fVaultPrice = hVaultSharesInY.mul(yVaultPrice).div(toWeiBN("1")).add(toWeiBN("4")).mul(toWeiBN("1")).div(toWeiBN("20"))
-    //             expect((await this.fVault.getPricePerFullShare()).toString()).to.equal(fVaultPrice.toString())
-    //             expect((await this.forward721.getPricePerFullShare()).toString()).to.equal(fVaultPrice.toString())
-    //             fVaultSupply = toBN((await this.fVault.totalSupply()).toString())
-    //         }
-    //         // buyer take order
-    //         let buyerShare;
-    //         {
-    //             await this.dai.connect(this.bob).mint(buyerMargin);
-    //             await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
-    //             await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
-    //             let hVaultBal = fVaultSupply.mul(fVaultPrice).div(toWeiBN("1"))
-    //             buyerShare = toBN(buyerMargin).mul(fVaultSupply).div(hVaultBal)
-    //             expect(equals(toBN((await this.forward721.orders(0)).buyerShare.toString()), buyerShare)).to.equal(true)
+        let tokenIds = [0, 1];
+        let orderValidPeriod = 7 * 24 * 3600;
+        let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
+        let deliveryPeriod = 12 * 3600;
+        let deliveryPrice = toWei("100", "ether");
+        let buyerMargin = toWei("10", "ether");
+        let sellerMargin = toWei("20", "ether");
+        let deposit = false;
+        let isSeller = true;
+        let now = await time.latest();
+        {
+            // yVault(b:101, t:100), hVault(shares:0, balance:0, totalsupply:0)
+            await this.dai.connect(this.alice).mint(sellerMargin);
+            await this.dai.connect(this.alice).approve(this.forward721.address, sellerMargin)
+            await this.forward721.connect(this.alice).createOrderFor(
+                this.alice.address,
+                tokenIds,
+                [orderValidPeriod,
+                now.toNumber() + nowToDeliverPeriod,
+                deliveryPeriod],
+                [deliveryPrice,
+                buyerMargin,
+                sellerMargin],
+                [],
+                deposit,
+                isSeller
+            );
+            // add profits to yVault
+            let yVaultPrice;
+            let yVaultSupply;
+            let hVaultSharesInY;
+            let fVaultSupply;
+            let fVaultPrice;
+            {
+                let order = await this.forward721.orders(0);
+                expect(order.sellerShare.toString()).to.equal(sellerMargin)
+                await this.fVault.rebase();
+                // yVault(b:101+20*0.8=117, t:117*100/101), hVault(shares:117*100/101-100, b:20, t:20)
+                await this.dai.connect(this.alice).mint(toWei("1"))
+                await this.dai.connect(this.alice).transfer(this.yVault.address, toWei("1"))
+                // yVault(b:118, t:117*100/101), hVault(s:117*100/101-100, b:h.s/y.b*y.t + 4, t:20)
+                yVaultSupply = toWeiBN("117").mul(toWeiBN("100")).div(toWeiBN("101"))
+                yVaultPrice = toWeiBN("118").mul(toWeiBN("101")).mul(toWeiBN("1")).div(toWeiBN("117")).div(toWeiBN("100"))
+                expect((await this.yVault.getPricePerFullShare()).toString()).to.equal(yVaultPrice.toString())
+                hVaultSharesInY = toWeiBN("117").mul(toWeiBN("100")).div(toWeiBN("101")).sub(toWeiBN("100"))
+                expect((await this.yVault.balanceOf(this.fVault.address)).toString()).to.equal(hVaultSharesInY.toString())
+                fVaultPrice = hVaultSharesInY.mul(yVaultPrice).div(toWeiBN("1")).add(toWeiBN("4")).mul(toWeiBN("1")).div(toWeiBN("20"))
+                expect((await this.fVault.getPricePerFullShare()).toString()).to.equal(fVaultPrice.toString())
+                expect((await this.forward721.getPricePerFullShare()).toString()).to.equal(fVaultPrice.toString())
+                fVaultSupply = toBN((await this.fVault.totalSupply()).toString())
+            }
+            // buyer take order
+            let buyerShare;
+            {
+                await this.dai.connect(this.bob).mint(buyerMargin);
+                await this.dai.connect(this.bob).approve(this.forward721.address, buyerMargin);
+                await this.forward721.connect(this.bob).takeOrderFor(this.bob.address, 0);
+                let hVaultBal = fVaultSupply.mul(fVaultPrice).div(toWeiBN("1"))
+                buyerShare = toBN(buyerMargin).mul(fVaultSupply).div(hVaultBal)
+                expect(equals(toBN((await this.forward721.orders(0)).buyerShare.toString()), buyerShare)).to.equal(true)
 
-    //         }
-    //         // Too complex to continue the mathamatic calculation....!
+            }
+            // Too complex to continue the mathamatic calculation....!
 
-    //     }
-    // })
+        }
+    })
 })
 
 function toWeiBN(obj) {
