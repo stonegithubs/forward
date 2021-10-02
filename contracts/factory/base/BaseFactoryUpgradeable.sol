@@ -29,9 +29,6 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     // only for emergency only if forward721, forward20, forward1155 is attacked
     bool public paused; 
 
-    uint public orderValidPeriod;
-    uint public deliveryPeriod;
-
     event PoolCreated(
         address indexed nftAddr,
         address margin,
@@ -62,9 +59,6 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         feeCollector = _feeCollector;
         require(_fee >= 0 && _fee < base, "!fee");
         fee = _fee;
-
-        orderValidPeriod = 7 days;
-        deliveryPeriod = 12 hours;
 
     }
 
@@ -98,11 +92,6 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         feeCollector = _feeCollector;
     }
 
-    function setPeriods(uint _orderValidPeriod, uint _deliveryPeriod) external virtual onlyOwner {
-        orderValidPeriod = _orderValidPeriod;
-        deliveryPeriod = _deliveryPeriod;
-    }
-
     function setForwardVault(uint256 _poolId, address _forwardVault) external virtual onlyOwner {
         IBaseForward(allPairs[_poolId]).setForwardVault(_forwardVault);
     }
@@ -113,10 +102,6 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     function getOperationFee() external view virtual override returns (uint, uint) {
         return (fee, base);
-    }
-
-    function getPeriods() external view virtual override returns (uint, uint) {
-        return (orderValidPeriod, deliveryPeriod);
     }
 
     function allPairsLength() external virtual view returns (uint) {

@@ -101,6 +101,9 @@ module.exports = {
   etherscan: {
     apiKey: `${config.etherScanApiKey}`,
   },
+  mocha: {
+    timeout: 200000
+  },
   solidity: {
     compilers: [
       {
@@ -124,9 +127,10 @@ module.exports = {
     showMethodSig: true,
     rst: true,
     onlyCalledMethods: true,
-    src:"./contracts/forward",
-    // proxyResolver: "implementation()", // (address _creator,uint _underlyingAmount, uint _orderValidPeriod,uint _deliveryStart,uint _deliveryPeriod,uint _deliveryPrice,uint _buyerMargin,uint _sellerMargin,bool _deposit,bool _isSeller)
+    src:"./contracts",
+    // proxyResolver: "implementation()",
     coinmarketcap: `${config.etherScanApiKey}`,
     currency: "USD",
+    outputFile: `${config.gasReporterFilePath}`,
   }
 };

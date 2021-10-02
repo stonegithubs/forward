@@ -61,6 +61,11 @@ describe("Forward20 TestCase with marginToken", function() {
         const tx = await this.factory20.connect(this.alice).deployPool(this.want.address, 20, this.dai.address)
         console.log("gasLimit-----factory20.deployPool----: ", tx.gasLimit.toString())
         this.forward20 = await this.Forward20Imp.attach(await this.factory20.allPairs(0));
+        console.log("tx is ", JSON.stringify(tx))
+        let receipt = await tx.wait();
+        console.log("receipt = ", JSON.stringify(receipt));
+        console.log("pool addr: ", receipt.events[1].args[3])
+        console.log("block height: ", (await web3.eth.getBlockNumber()))
     })
 
     it("should deliver correctly for both seller and buyer", async() => {

@@ -9,7 +9,6 @@ interface IHogletFactory is IBeacon {
     // read methods
     function ifMarginSupported(address coin) external view returns (bool);
     function getOperationFee() external view returns (uint fee, uint base);
-    function getPeriods() external view returns (uint, uint);
     function feeCollector() external view returns (address);
     function version() external returns (string memory);
 }

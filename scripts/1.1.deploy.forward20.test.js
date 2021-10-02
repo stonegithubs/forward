@@ -37,82 +37,32 @@ async function main() {
         );
         
         // We get the contract to deploy
-        const Dai = await ethers.getContractFactory("MockERC20")
+        const Token20 = await ethers.getContractFactory("MockERC20")
+        const Token721 = await ethers.getContractFactory("MockERC721")
+        const Token1155 = await ethers.getContractFactory("MockERC1155")
         const WETH = await ethers.getContractFactory("WETH9")
         const Forward20Imp = await ethers.getContractFactory("Forward20Upgradeable");
+        const Forward721Imp = await ethers.getContractFactory("Forward721Upgradeable");
+        const Forward1155Imp = await ethers.getContractFactory("Forward1155Upgradeable");
         const Factory20 = await ethers.getContractFactory("Factory20Upgradeable")
+        const Factory721 = await ethers.getContractFactory("Factory721Upgradeable")
+        const Factory1155 = await ethers.getContractFactory("Factory1155Upgradeable")
         const Router = await ethers.getContractFactory("ForwardEtherRouter")
-        const Forward20 = await ethers.getContractFactory("Forward20Upgradeable")
-
-        if ( !config[network.name].deployed.hasOwnProperty("weth") || config[network.name].deployed.weth == "") {
-            const weth = await WETH.deploy()
-            await weth.deployed();
-            console.log('deploy weth: ', weth.address)
-            config[network.name].deployed.weth = weth.address
-            utils.saveConfig(config);
-        }
-
-        if ( !config[network.name].deployed.hasOwnProperty("dai") || config[network.name].deployed.dai == "") {
-            const dai = await Dai.deploy("Dai Token", "DAI", 0)
-            await dai.deployed();
-            console.log('deploy dai: ', dai.address)
-            config[network.name].deployed.dai = dai.address
-            utils.saveConfig(config);
-        }
-
-        if (!config[network.name].deployed.hasOwnProperty("router") || config[network.name].deployed.router == "") {
-            const router = await Router.deploy(config[network.name].deployed.weth);
-            await router.deployed()
-            console.log('deploy router: ', router.address)
-            config[network.name].deployed.router = router.address
-            utils.saveConfig(config);
-        }
-
-        if (!config[network.name].deployed.hasOwnProperty("forward20Imp") || config[network.name].deployed.forward20Imp == "") {
-            const forward20Imp = await Forward20Imp.deploy();
-            await forward20Imp.deployed();
-            console.log('deploy forward20Imp: ', forward20Imp.address)
-            config[network.name].deployed.forward20Imp = forward20Imp.address
-            utils.saveConfig(config);
-        }
-
-
-        if (!config[network.name].deployed.hasOwnProperty("factory20") || config[network.name].deployed.factory20 == "") {
-            const factory20 = await upgrades.deployProxy(
-                Factory20,
-                [
-                    config[network.name].deployed.forward20Imp, 
-                    [config[network.name].deployed.dai, config[network.name].deployed.weth], 
-                    deployer.address, 
-                    10/* 10 /10000 */
-                ],
-                {
-                    initializer: "__FactoryUpgradeable__init"
-                }
-            );
-            console.log('deploy factory20: ', factory20.address)
-            config[network.name].deployed.factory20 = factory20.address
-            utils.saveConfig(config);
-        }
         
+        // load factory
         const factory20 = await Factory20.attach(config[network.name].deployed.factory20);
+        const factory721 = await Factory721.attach(config[network.name].deployed.factory721);
+        const factory1155 = await Factory1155.attach(config[network.name].deployed.factory1155);
+        // load pool
+        const forward20daiweth = await Forward20Imp.attach(config[network.name].deployed.forward20daiweth)
+        const forward20wethdai = await Forward20Imp.attach(config[network.name].deployed.forward20wethdai)
+        const forward721nftdai = await Forward721Imp.attach(config[network.name].deployed.forward721nftdai)
+        const forward721nftweth = await Forward721Imp.attach(config[network.name].deployed.forward721nftweth)
+        const forward1155sworddai = await Forward1155Imp.attach(config[network.name].deployed.forward1155sworddai)
+        const forward1155swordweth = await Forward1155Imp.attach(config[network.name].deployed.forward1155swordweth)
+
         
-        
-        // const tx = await factory20.connect(deployer).deployPool(config[network.name].deployed.weth, 20, config[network.name].deployed.dai)
-        // // console.log("gasLimit-----factory20.deployPool----: ", tx.gasLimit.toString())
-
-        // // await factory20.connect(deployer).deployPool(config[network.name].deployed.dai, 20, config[network.name].deployed.weth)
-        // // await factory20.connect(deployer).deployPool(config[network.name].deployed.dai, 20, config[network.name].deployed.weth)
-
-
-        const forward20_0 = await Forward20.attach(await factory20.allPairs(0))
-        const orderLen = await forward20_0.ordersLength();
-        console.log("ordre length = ", orderLen.toString())
-        if (orderLen.toNumber() > 0) {
-            return;
-        }
-
-        {
+        if (false) {
             const Web3 = require('web3');
             const toWei = Web3.utils.toWei
 
