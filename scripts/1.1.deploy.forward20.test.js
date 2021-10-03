@@ -4,7 +4,8 @@
 // When running the script with `npx hardhat run <script>` you'll find the Hardhat
 // Runtime Environment's members available in the global scope.
 const { deploy } = require("@openzeppelin/hardhat-upgrades/dist/utils");
-const { ethers, upgrades, network } = require("hardhat");
+const { time } = require("@openzeppelin/test-helpers");
+const { ethers, upgrades, network, web3 } = require("hardhat");
 const utils = require('./utils')
 
 async function main() {
@@ -17,8 +18,10 @@ async function main() {
     let config = utils.getConfig();
 
     const signers = await ethers.getSigners();
-    const deployer = signers[0]
+    const alice = signers[0]
+    const bob = signers[1]
     console.log("network is ", network.name)
+    console.log("network is ", network.config.gasLimit)
     
     
     
@@ -27,12 +30,13 @@ async function main() {
         network.name == "local"         /*local node*/
         || network.name == 'ropsten'    /*ropsten testnet */
         || network.name == "kovan"
+        || network.name == 'rinkeby'    /*ropsten testnet */
         ) {
         
-        console.log("Deploying account:", await deployer.getAddress());
+        console.log("Deploying account:", await alice.getAddress());
         console.log(
             "Deploying account balance:",
-            (await deployer.getBalance()).toString(),
+            (await alice.getBalance()).toString(),
             "\n"
         );
         
@@ -60,53 +64,115 @@ async function main() {
         const forward721nftweth = await Forward721Imp.attach(config[network.name].deployed.forward721nftweth)
         const forward1155sworddai = await Forward1155Imp.attach(config[network.name].deployed.forward1155sworddai)
         const forward1155swordweth = await Forward1155Imp.attach(config[network.name].deployed.forward1155swordweth)
-
         
-        if (false) {
-            const Web3 = require('web3');
-            const toWei = Web3.utils.toWei
+        // console.log("sleeping start")
+        // await sleep(10)
+        // console.log("sleeping done")
+        
+        // console.log("sleeping start")
+        // await sleep(10)
+        // console.log("sleeping done")
 
-            let tokenIds = toWei("10");
-            let orderValidPeriod = 600;
-            let nowToDeliverPeriod = orderValidPeriod + 20 * 60;
-            let now = (await forward20_0._getBlockTimestamp()).toNumber();
+        // console.log("sleeping start")
+        // await sleep(10)
+        // console.log("sleeping done")
+        // return
+
+
+        const Web3 = require('web3');
+        const toWei = Web3.utils.toWei
+        const dai = await Token20.attach(config[network.name].deployed.dai);
+        const nft = await Token721.attach(config[network.name].deployed.nft);
+        // create order 
+        let orderId = (await forward721nftdai.ordersLength()).toNumber() + 1
+        orderId = 5;
+        console.log("orderId = ", orderId)
+        const tokenIds = [0+orderId, 10000+orderId];
+        const deliveryPrice = toWei("0.0000001", "ether");
+
+        let tx;
+        if ((await forward721nftdai.checkOrderState(orderId)).toString() == "0") { // not active
+            let height = await web3.eth.getBlockNumber();
+            let block = await web3.eth.getBlock(height);
+            let now = block.timestamp
             console.log("now = ", now)
-            let deliveryStart = now + nowToDeliverPeriod;
-            let deliveryPeriod = 600;
-            let deliveryPrice = toWei("0.0001", "ether");
-            let buyerMargin = toWei("0.0001", "ether");
-            let sellerMargin = toWei("0.0002", "ether");
+            console.log("now = ", (await time.latest()).toNumber())
+            console.log("now = ", (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp)
+            // return
+            let unitDuration = 60; // seconds
+            let orderValidPeriod = 3 * unitDuration;
+            let nowToDeliverPeriod = orderValidPeriod + 3 * unitDuration;
+            // return
+            let deliverStart = now + nowToDeliverPeriod;
+            let deliveryPeriod = 3 * unitDuration;
+            let buyerMargin =   toWei("0.00000001", "ether");
+            let sellerMargin =  toWei("0.00000001", "ether");
             let deposit = false;
             let isSeller = true;
-            console.log("tokenIds = ", tokenIds.toString());
-            console.log("orderValidPeriod = ", orderValidPeriod);
-            console.log("deliveryStart = ", deliveryStart);
-            console.log("deliveryPeriod = ", deliveryPeriod);
-            console.log("deliveryPrice = ", deliveryPrice.toString());
-            console.log("buyerMargin = ", buyerMargin.toString());
-            console.log("sellerMargin = ", sellerMargin.toString());
+            let validTill;
+            let order;
             
-
-            const dai = await Dai.attach(config[network.name].deployed.dai);
-            await dai.connect(deployer).mint(sellerMargin);
-            await dai.connect(deployer).approve(forward20_0.address, sellerMargin)
-
-
-
-            const tx = await forward20_0.connect(deployer).createOrderFor(
-                deployer.address,
+            tx = await dai.connect(alice).mint(sellerMargin, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
+            tx = await dai.connect(alice).approve(forward721nftdai.address, sellerMargin, {gasLimit: network.config.gasLimit})
+            // await tx.wait();
+            tx = await forward721nftdai.connect(alice).createOrderFor(
+                alice.address,
                 tokenIds,
-                orderValidPeriod,
-                deliveryStart,
-                deliveryPeriod,
-                deliveryPrice,
+                [orderValidPeriod,
+                deliverStart.toString(),
+                deliveryPeriod],
+                [deliveryPrice,
                 buyerMargin,
-                sellerMargin,
+                sellerMargin],
+                [],
                 deposit,
-                isSeller
+                isSeller,
+                {gasLimit: network.config.gasLimit}
             );
-            console.log("tx is: ", JSON.stringify(tx))
-            console.log("gasLimit-----createOrder----: ", tx.gasLimit.toString(), tx.gasLimit.div(baseGasConsumed).toString())
+            let receipt = await tx.wait();
+            console.log("receipt is: ", JSON.stringify(receipt))
+            console.log("gasUsed-----createOrder 721----: ", receipt.gasUsed.toString())
+            console.log("now = ", (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp)
+        }
+        if ((await forward721nftdai.checkOrderState(orderId)).toString() == "1"){ // active
+            let buyerMargin = (await forward721nftdai.orders(orderId)).buyerMargin;
+            tx = await dai.connect(bob).mint(buyerMargin, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
+            tx = await dai.connect(bob).approve(forward721nftdai.address, buyerMargin, {gasLimit: network.config.gasLimit})
+            // await tx.wait();
+            tx = await forward721nftdai.connect(bob).takeOrderFor(bob.address, orderId, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
+        }
+        if ((await forward721nftdai.checkOrderState(orderId)).toString() == "4"){ // delivery
+            let order = await forward721nftdai.orders(orderId);
+            let deliverStart = order.deliverStart
+            let now = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
+            console.log("deliver start at: ", deliverStart)
+            console.log("now             : ", now)
+            // seller deliver
+            for (let i = 0; i < tokenIds.length; i++) {
+                tx = await nft.connect(alice).mint(alice.address, tokenIds[i], {gasLimit: network.config.gasLimit});
+                // await tx.wait();
+                tx = await nft.connect(alice).approve(forward721nftdai.address, tokenIds[i], {gasLimit: network.config.gasLimit});
+                // await tx.wait();
+            }
+            console.log("now             : ", now)
+            now = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
+            if (deliverStart > now) {
+                console.log("starting sleep for", deliverStart - now, "seconds....")
+                await sleep(deliverStart - now)
+                console.log("sleeping done")
+            }
+            tx = await forward721nftdai.connect(alice).deliverFor(alice.address, orderId, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
+            // buyer deliver, meanwhile settle it
+            tx = await dai.connect(bob).mint(deliveryPrice, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
+            tx = await dai.connect(bob).approve(forward721nftdai.address, deliveryPrice, {gasLimit: network.config.gasLimit})
+            // await tx.wait();
+            tx = await forward721nftdai.connect(bob).deliverFor(bob.address, orderId, {gasLimit: network.config.gasLimit});
+            // await tx.wait();
         }
 
     } else {
@@ -114,6 +180,10 @@ async function main() {
     }
     
 }
+
+const sleep = (seconds) => {
+    return new Promise(resolve => setTimeout(resolve, 1000 * seconds))
+  }
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.

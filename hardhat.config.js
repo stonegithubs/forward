@@ -63,13 +63,15 @@ module.exports = {
       url: `https://ropsten.infura.io/v3/${config.ropsten.infuraKey}`,
       accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
     },
-    kovan:  {
-      url: `https://ropsten.infura.io/v3/${config.kovan.infuraKey}`,
-      accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
-    },
+    // kovan:  {
+    //   url: `https://ropsten.infura.io/v3/${config.kovan.infuraKey}`,
+    //   accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
+    // },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${config.ropsten.infuraKey}`,
       accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
+      gasPrice: 1 * 1100000000, // 1.1 gwei
+      gasLimit: 1000000, // 
     },
     // mainnet: {
     //   url: `https://eth-mainnet.alchemyapi.io/v2/${config.ropsten.alchemyApiKey}`,
@@ -131,6 +133,6 @@ module.exports = {
     // proxyResolver: "implementation()",
     coinmarketcap: `${config.etherScanApiKey}`,
     currency: "USD",
-    outputFile: `${config.gasReporterFilePath}`,
+    // outputFile: `${config.gasReporterFilePath}`,
   }
 };

@@ -12,7 +12,14 @@ import "../library/TransferHelper.sol";
 contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeable {
 
     // orderId => tokenIds
-    mapping(uint => uint[]) public underlyingAssets;
+    struct Asset {
+        uint[] amounts;
+    }
+    mapping(uint => Asset) internal underlyingAssets_;
+
+    function underlyingAssets(uint _orderId) external view returns (uint[] memory) {
+        return underlyingAssets_[_orderId].amounts;
+    }
 
     function __Forward721Upgradeable__init(
         address _want,
@@ -59,9 +66,10 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             _deposit, 
             _isSeller
         );
+
         uint curOrderIndex = ordersLength - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
-            underlyingAssets[curOrderIndex].push(_tokenIds[i]);
+            underlyingAssets_[curOrderIndex].amounts.push(_tokenIds[i]);
         }
         
     }
@@ -71,11 +79,11 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
     * @param _orderId the order msg.sender wants to deliver
      */
     function _pullUnderlyingAssetsToSelf(uint _orderId) internal virtual override {
-        _pull721TokensToSelf(underlyingAssets[_orderId]);
+        _pull721TokensToSelf(underlyingAssets_[_orderId].amounts);
     }
 
     function _pushUnderlyingAssetsFromSelf(uint _orderId, address _to) internal virtual override {
-        _push721FromSelf(underlyingAssets[_orderId], _to);
+        _push721FromSelf(underlyingAssets_[_orderId].amounts, _to);
     }
     
 

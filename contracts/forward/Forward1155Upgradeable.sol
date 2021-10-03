@@ -14,8 +14,8 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable, ERC1155HolderUpgradea
         uint[] ids;
         uint[] amounts;
     }
-    // orderId => Asset
-    Asset[] internal underlyingAssets_;
+    // orderId => Asset, we use map rather than array to save gas
+    mapping(uint => Asset) internal underlyingAssets_;
 
     
 
@@ -71,15 +71,11 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable, ERC1155HolderUpgradea
             _deposit, 
             _isSeller
         );
-        underlyingAssets_.push(
-            Asset({
-                ids: new uint[](_ids.length),
-                amounts: new uint[](_ids.length)
-            })
-        );
+
+        uint curOrderIndex = ordersLength - 1;
         for (uint i = 0; i < _ids.length; i++) {
-            underlyingAssets_[underlyingAssets_.length - 1].ids[i] = _ids[i];
-            underlyingAssets_[underlyingAssets_.length - 1].amounts[i] = _amounts[i];
+            underlyingAssets_[curOrderIndex].ids.push(_ids[i]);
+            underlyingAssets_[curOrderIndex].amounts.push(_amounts[i]);
         }
     }
 
