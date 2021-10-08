@@ -84,9 +84,10 @@ async function main() {
         const dai = await Token20.attach(config[network.name].deployed.dai);
         const nft = await Token721.attach(config[network.name].deployed.nft);
         // create order 
-        let orderId = (await forward721nftdai.ordersLength()).toNumber() + 1
-        orderId = 5;
+        let orderId = (await forward721nftdai.ordersLength()).toNumber()
+        // orderId = 3;
         console.log("orderId = ", orderId)
+        console.log("status  = ", (await forward721nftdai.checkOrderState(orderId)).toString())
         const tokenIds = [0+orderId, 10000+orderId];
         const deliveryPrice = toWei("0.0000001", "ether");
 
@@ -131,10 +132,11 @@ async function main() {
                 {gasLimit: network.config.gasLimit}
             );
             let receipt = await tx.wait();
-            console.log("receipt is: ", JSON.stringify(receipt))
-            console.log("gasUsed-----createOrder 721----: ", receipt.gasUsed.toString())
-            console.log("now = ", (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp)
+            console.log("txHash: ", receipt.transactionHash)
+            console.log("gasUsed-----createOrderFor 721----: ", receipt.gasUsed.toString())
+            console.log("status  = ", (await forward721nftdai.checkOrderState(orderId)).toString())
         }
+        
         if ((await forward721nftdai.checkOrderState(orderId)).toString() == "1"){ // active
             let buyerMargin = (await forward721nftdai.orders(orderId)).buyerMargin;
             tx = await dai.connect(bob).mint(buyerMargin, {gasLimit: network.config.gasLimit});
@@ -142,9 +144,13 @@ async function main() {
             tx = await dai.connect(bob).approve(forward721nftdai.address, buyerMargin, {gasLimit: network.config.gasLimit})
             // await tx.wait();
             tx = await forward721nftdai.connect(bob).takeOrderFor(bob.address, orderId, {gasLimit: network.config.gasLimit});
+            let receipt = await tx.wait();
+            console.log("txHash: ", receipt.transactionHash)
+            console.log("gasUsed-----takeOrderFor 721----: ", receipt.gasUsed.toString())
             // await tx.wait();
         }
-        if ((await forward721nftdai.checkOrderState(orderId)).toString() == "4"){ // delivery
+        let status = (await forward721nftdai.checkOrderState(orderId)).toString();
+        if (status == "2" || status == "4"){ // filled => delivery
             let order = await forward721nftdai.orders(orderId);
             let deliverStart = order.deliverStart
             let now = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
@@ -153,26 +159,28 @@ async function main() {
             // seller deliver
             for (let i = 0; i < tokenIds.length; i++) {
                 tx = await nft.connect(alice).mint(alice.address, tokenIds[i], {gasLimit: network.config.gasLimit});
-                // await tx.wait();
                 tx = await nft.connect(alice).approve(forward721nftdai.address, tokenIds[i], {gasLimit: network.config.gasLimit});
-                // await tx.wait();
             }
             console.log("now             : ", now)
             now = (await web3.eth.getBlock(await web3.eth.getBlockNumber())).timestamp
             if (deliverStart > now) {
                 console.log("starting sleep for", deliverStart - now, "seconds....")
-                await sleep(deliverStart - now)
+                await sleep(deliverStart - now + 5)
                 console.log("sleeping done")
             }
             tx = await forward721nftdai.connect(alice).deliverFor(alice.address, orderId, {gasLimit: network.config.gasLimit});
-            // await tx.wait();
+            let receipt = await tx.wait();
+            console.log("txHash: ", receipt.transactionHash)
+            console.log("gasUsed-----deliverFor 721----: ", receipt.gasUsed.toString())
             // buyer deliver, meanwhile settle it
             tx = await dai.connect(bob).mint(deliveryPrice, {gasLimit: network.config.gasLimit});
             // await tx.wait();
             tx = await dai.connect(bob).approve(forward721nftdai.address, deliveryPrice, {gasLimit: network.config.gasLimit})
             // await tx.wait();
             tx = await forward721nftdai.connect(bob).deliverFor(bob.address, orderId, {gasLimit: network.config.gasLimit});
-            // await tx.wait();
+            receipt = await tx.wait();
+            console.log("txHash: ", receipt.transactionHash)
+            console.log("gasUsed-----deliverFor 721----: ", receipt.gasUsed.toString())
         }
 
     } else {

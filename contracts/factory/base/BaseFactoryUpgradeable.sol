@@ -30,10 +30,10 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     bool public paused; 
 
     event PoolCreated(
-        address indexed nftAddr,
+        address indexed asset,
         address margin,
-        uint poolType,
-        address marginToken,
+        uint assetType,
+        address forward,
         uint index
     );
 
@@ -110,7 +110,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     function deployPool(
         address _asset,
-        uint _poolType,
+        uint _assetType,
         address _margin
     ) external virtual {
         require(poolDeployer == address(0) || msg.sender == poolDeployer, "!poolDeployer");
@@ -125,16 +125,16 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         bytes32 salt = keccak256(abi.encodePacked(_asset, _poolType, _margin));
         beaconProxyAddr = Clones.cloneDeterministic(implementation(), salt);
         */
-        address beaconProxyAddr = _deployPool(_asset, _poolType, _margin);
+        address beaconProxyAddr = _deployPool(_asset, _assetType, _margin);
 
         allPairs.push(beaconProxyAddr);
 
-        emit PoolCreated(_asset, _margin, _poolType, beaconProxyAddr, allPairs.length);
+        emit PoolCreated(_asset, _margin, _assetType, beaconProxyAddr, allPairs.length);
     }
 
     function _deployPool(
          address _asset,
-        uint _poolType,
+        uint _assetType,
         address _margin
     ) internal virtual returns (address);
     
