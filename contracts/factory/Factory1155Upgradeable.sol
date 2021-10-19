@@ -9,14 +9,14 @@ contract Factory1155Upgradeable is BaseFactoryUpgradeable {
 
     function _deployPool(
         address _asset,
-        uint _poolType,
+        uint _assetType,
         address _margin
     ) internal virtual override returns (address) {
 
         address beaconProxyAddr;
-        if (_poolType == 1155) {
+        if (_assetType == 1155) {
             beaconProxyAddr = address(new BeaconProxy(address(this), ""));
-            Forward1155Upgradeable(beaconProxyAddr).__Forward1155Upgradeable__init(_asset, _poolType, _margin);
+            Forward1155Upgradeable(beaconProxyAddr).__Forward1155Upgradeable__init(_asset, _assetType, _margin);
 
         } else {
             revert("only support 1155");

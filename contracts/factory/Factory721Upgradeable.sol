@@ -9,14 +9,14 @@ contract Factory721Upgradeable is BaseFactoryUpgradeable {
 
     function _deployPool(
         address _asset,
-        uint _poolType,
+        uint _assetType,
         address _margin
     ) internal virtual override returns (address) {
 
         address beaconProxyAddr;
-        if (_poolType == 721) {
+        if (_assetType == 721) {
             beaconProxyAddr = address(new BeaconProxy(address(this), ""));
-            Forward721Upgradeable(beaconProxyAddr).__Forward721Upgradeable__init(_asset, _poolType, _margin);
+            Forward721Upgradeable(beaconProxyAddr).__Forward721Upgradeable__init(_asset, _assetType, _margin);
 
         } else {
             revert("only support 721");
