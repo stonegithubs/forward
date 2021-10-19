@@ -233,6 +233,7 @@ contract BaseForwardUpgradeable is Initializable {
             if (order.state != State.filled) return State.active;
             return State.filled;
         }
+        if (order.state == State.active) return State.dead;
         if (time <= order.deliverStart) {
             if (order.state != State.filled) return State.dead;
             return State.filled;
