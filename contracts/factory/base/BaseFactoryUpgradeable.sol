@@ -28,6 +28,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     // only for emergency only if forward721, forward20, forward1155 is attacked
     bool public paused; 
+    bool public ifEnableSupportMargin;
 
     event PoolCreated(
         address indexed asset,
@@ -59,7 +60,12 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         feeCollector = _feeCollector;
         require(_fee >= 0 && _fee < base, "!fee");
         fee = _fee;
+        ifEnableSupportMargin = true;
 
+    }
+
+    function toggleSupportMargin() public virtual onlyOwner {
+        ifEnableSupportMargin = !ifEnableSupportMargin;
     }
 
     function supportMargin(address _token) public virtual onlyOwner {
@@ -97,7 +103,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     }
 
     function ifMarginSupported(address _token) public view virtual override returns (bool) {
-        return _token == address(0) || supportedMargins[_token] > 0;
+        return !ifEnableSupportMargin || (_token == address(0) || supportedMargins[_token] > 0);
     }
 
     function getOperationFee() external view virtual override returns (uint, uint) {
