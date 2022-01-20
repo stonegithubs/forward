@@ -58,9 +58,9 @@ contract BaseForwardUpgradeable is Initializable {
 
 
     // event
-    event CreateOrder(uint orderId);
-    event TakeOrder(uint orderId);
-    event Delivery(uint orderId);
+    event CreateOrder(uint orderId, address maker);
+    event TakeOrder(uint orderId, address taker);
+    event Delivery(uint orderId, address deliver);
     event Settle(uint orderId);
     event CancelOrder(uint orderId);
 
@@ -288,11 +288,11 @@ contract BaseForwardUpgradeable is Initializable {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -332,7 +332,7 @@ contract BaseForwardUpgradeable is Initializable {
                 orders[index].takerWhiteList.push(_takerWhiteList[i]);
             }
         }
-        emit CreateOrder(index);
+        emit CreateOrder(index, _creator);
     
     }
 
@@ -374,7 +374,7 @@ contract BaseForwardUpgradeable is Initializable {
             revert("takeOrder bug");
         }
         orders[_orderId].state = State.filled;
-        emit TakeOrder(_orderId);
+        emit TakeOrder(_orderId, _taker);
     }
     
 
@@ -386,7 +386,7 @@ contract BaseForwardUpgradeable is Initializable {
             // seller tends to deliver underlyingAssets[_orderId] amount of want tokens
             _pullUnderlyingAssetsToSelf(_orderId);
             orders[_orderId].sellerDelivered = true;
-            emit Delivery(_orderId);
+            emit Delivery(_orderId, _deliverer);
         } else if (_deliverer == order.buyer && !order.buyerDelivered) {
             // buyer tends to deliver tokens
             (uint fee, uint base) = IHogletFactory(factory).getOperationFee();
@@ -396,7 +396,7 @@ contract BaseForwardUpgradeable is Initializable {
                 false /* here we do not farm delivered tokens since they just stay in contract for delivery period at most */
             );  
             orders[_orderId].buyerDelivered = true;
-            emit Delivery(_orderId);
+            emit Delivery(_orderId, _deliverer);
         } else {
             revert("deliver bug");
         }
@@ -484,7 +484,9 @@ contract BaseForwardUpgradeable is Initializable {
     function _pullTokensToSelf(address _token, uint _amount) internal virtual {
         // below check is not necessary since we would check supported margin is untaxed
         // uint mtOld = IERC20Upgradeable(_token).balanceOf(address(this));
-        IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        if (_amount > 0) {
+            IERC20Upgradeable(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        }
         // uint mtNew = IERC20Upgradeable(_token).balanceOf(address(this));
         // require(mtNew.sub(mtOld) == _amount, "!support taxed token");
         

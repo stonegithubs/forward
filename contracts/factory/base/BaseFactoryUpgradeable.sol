@@ -54,7 +54,8 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         supportedMargins[address(0)] = type(int256).min;
 
         for (uint i = 0; i < _margins.length; i++) {
-            supportMargin(_margins[i]);
+            supportedMargins[_margins[i]] = int(enabledMargins.length);
+            enabledMargins.push(_margins[i]);
         }
 
         feeCollector = _feeCollector;
@@ -73,8 +74,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
         require(!ifMarginSupported(_token), "supported already");
         if (uint(supportedMargins[_token]) == 0) {
-            enabledMargins.push(_token);
-            supportedMargins[_token] = int(enabledMargins.length);
+            supportedMargins[_token] = int(enabledMargins.length);enabledMargins.push(_token);
         } else {
             supportedMargins[_token] = -supportedMargins[_token];
         }

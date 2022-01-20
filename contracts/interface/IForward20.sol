@@ -7,7 +7,7 @@ import "./IBaseForward.sol";
 interface IForward721 is IBaseForward  {
     function createOrderFor(
         address _creator,
-        uint[] memory _tokenIds, 
+        uint _underlyingAmount, 
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
@@ -20,7 +20,6 @@ interface IForward721 is IBaseForward  {
         bool _deposit,
         bool _isSeller
     ) external;
-    
-    function underlyingAssets(uint _orderId) external view returns (uint256[] memory);
 
+    function underlyingAssets(uint _orderId) external view returns (uint amount);
 }

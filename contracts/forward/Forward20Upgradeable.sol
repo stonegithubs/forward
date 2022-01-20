@@ -25,11 +25,11 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller

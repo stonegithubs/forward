@@ -1,8 +1,7 @@
-
-require("@openzeppelin/hardhat-upgrades");
-require("@nomiclabs/hardhat-etherscan");
-require('@nomiclabs/hardhat-truffle5');
-require("hardhat-gas-reporter");
+require('@openzeppelin/hardhat-upgrades')
+require('@nomiclabs/hardhat-etherscan')
+require('@nomiclabs/hardhat-truffle5')
+require('hardhat-gas-reporter')
 
 /** In order to compile and verify using any specific solcjs version, we can use the following 
      referring to : https://github.com/fvictorio/hardhat-examples/tree/master/custom-solc
@@ -38,13 +37,13 @@ subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD, async (args, hre, runSuper) => {
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
-task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
-  const accounts = await hre.ethers.getSigners();
+task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
+  const accounts = await hre.ethers.getSigners()
 
   for (const account of accounts) {
-    console.log(account.address);
+    console.log(account.address)
   }
-});
+})
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -54,24 +53,32 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 
 const utils = require('./scripts/utils')
-const config = utils.getConfig();
+const config = utils.getConfig()
 
 module.exports = {
-
   networks: {
-    ropsten:  {
+    ropsten: {
       url: `https://ropsten.infura.io/v3/${config.ropsten.infuraKey}`,
-      accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
+      accounts: [
+        `0x${config.ropsten.privateKeys[0]}`,
+        `0x${config.ropsten.privateKeys[1]}`,
+      ],
     },
     // kovan:  {
     //   url: `https://ropsten.infura.io/v3/${config.kovan.infuraKey}`,
     //   accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
     // },
     rinkeby: {
-      url: `https://rinkeby.infura.io/v3/${config.ropsten.infuraKey}`,
-      accounts: [`0x${config.ropsten.privateKeys[0]}`, `0x${config.ropsten.privateKeys[1]}`],
-      gasPrice: 1 * 1100000000, // 1.1 gwei
-      gasLimit: 1000000, // 
+      url: `https://rinkeby.infura.io/v3/${config.rinkeby.infuraKey}`,
+      accounts: [
+        `0x${config.rinkeby.privateKeys[0]}`,
+        `0x${config.rinkeby.privateKeys[1]}`,
+        `0x${config.rinkeby.privateKeys[2]}`,
+      ],
+      // gasPrice: 1.1 * 1000000000, // 1.1 gwei
+      // gasLimit: 5000000, //
+      gas: 2100000,
+      gasPrice: 8000000000,
     },
     // mainnet: {
     //   url: `https://eth-mainnet.alchemyapi.io/v2/${config.ropsten.alchemyApiKey}`,
@@ -95,7 +102,7 @@ module.exports = {
 
     local: {
       // need to run local node manually
-      url: "http://localhost:8545",
+      url: 'http://localhost:8545',
       allowUnlimitedContractSize: true,
       timeout: 2800000,
     },
@@ -104,12 +111,12 @@ module.exports = {
     apiKey: `${config.etherScanApiKey}`,
   },
   mocha: {
-    timeout: 200000
+    timeout: 200000,
   },
   solidity: {
     compilers: [
       {
-        version: "0.8.4",
+        version: '0.8.4',
         settings: {
           optimizer: {
             enabled: true, // true for release, false is default for debug and test
@@ -117,22 +124,20 @@ module.exports = {
           },
         },
       },
-
       {
-        version: "0.4.25",
-      }
-    ]
-    
+        version: '0.4.25',
+      },
+    ],
   },
   gasReporter: {
-    enabled: (`${config.etherScanApiKey}`) ? true : false,
+    enabled: `${config.etherScanApiKey}` ? true : false,
     showMethodSig: true,
     rst: true,
     onlyCalledMethods: true,
-    src:"./contracts",
+    src: './contracts',
     // proxyResolver: "implementation()",
     coinmarketcap: `${config.etherScanApiKey}`,
-    currency: "USD",
+    currency: 'USD',
     // outputFile: `${config.gasReporterFilePath}`,
-  }
-};
+  },
+}

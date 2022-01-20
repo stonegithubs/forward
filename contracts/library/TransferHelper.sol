@@ -10,15 +10,18 @@ Blockchain Cuties: https://etherscan.io/address/0xd73be539d6b2076bab83ca6ba62dfe
 Makersplace v2: https://etherscan.io/address/0x2a46f2ffd99e19a89476e2f62270e0a35bbf0756 (problem same as CryptoVoxels, wrong selector, we can only use transferFrom)
 */
 library TransferHelper {
+    address constant kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
+    // // TODO: mainnet
+    // address constant punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
+    // TODO: rinkeby
+    address constant punks = 0xD03b517DFA5d14C3c7642D974Ddc1B8B2C8E2D18;
 
+    address constant voxels = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
+    address constant makersTokenV2 = 0x2A46f2fFD99e19a89476E2f62270e0a35bBf0756;
     // Non-standard ERC721 projects:  https://docs.niftex.org/general/supported-nfts
     // implementation refers to: https://github.com/NFTX-project/nftx-protocol-v2/blob/master/contracts/solidity/NFTXVaultUpgradeable.sol#L444
     // TODO: improve implemention to include more non-standard ERC721 impl and change standard to safe-(invoke) way
     function _pushERC721(address assetAddr, address from, address to, uint256 tokenId) internal {
-        address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
-        address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-        address voxels = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
-        address makersTokenV2 = 0x2A46f2fFD99e19a89476E2f62270e0a35bBf0756;
         bytes memory data;
         if (assetAddr == kitties) {
             // data = abi.encodeWithSignature("transfer(address,uint256)", to, tokenId); 
@@ -42,10 +45,6 @@ library TransferHelper {
     }
 
     function _pullERC721(address assetAddr, address from, address to, uint256 tokenId) internal {
-        address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
-        address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-        address voxels = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
-        address makersTokenV2 = 0x2A46f2fFD99e19a89476E2f62270e0a35bBf0756;
         bytes memory data;
         if (assetAddr == kitties) {
             // Cryptokitties.
@@ -73,10 +72,6 @@ library TransferHelper {
     }
 
     function _approveERC721(address assetAddr, address owner, address spender, uint256 tokenId) internal {
-        address kitties = 0x06012c8cf97BEaD5deAe237070F9587f8E7A266d;
-        address punks = 0xb47e3cd837dDF8e4c57F05d70Ab865de6e193BBB;
-        address voxels = 0x79986aF15539de2db9A5086382daEdA917A9CF0C;
-        address makersTokenV2 = 0x2A46f2fFD99e19a89476E2f62270e0a35bBf0756;
         if (assetAddr == kitties) {
             // Cryptokitties.
             // (bool success, bytes memory result) = assetAddr.call(abi.encodeWithSignature("approve(address,uint256)", spender, tokenId));

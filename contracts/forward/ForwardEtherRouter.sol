@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "../library/TransferHelper.sol";
-
+import "../interface/IBaseForward.sol";
 interface IWETH {
 
     function deposit() external payable;
@@ -25,36 +25,6 @@ interface IWETH {
 }
 
 
-interface IBaseForward {
-    function cancelOrder(uint _orderId) external;
-    function takeOrderFor(address _taker, uint _orderId) external;
-    function deliverFor(address _deliverer, uint _orderId) external;
-    function settle(uint _orderId) external;
-
-    function margin() external view returns (address);
-    function want() external view returns (address);
-    enum State { inactive, active, filled, dead, delivery, expired, settled, canceled}
-    struct Order {
-        // using uint128 can help save 50k gas
-        uint128 buyerMargin;
-        uint128 sellerMargin;
-        uint128 buyerShare;
-        uint128 sellerShare;
-        uint128 deliveryPrice;
-        uint40 validTill;
-        uint40 deliverStart;         // timpstamp
-        uint40 expireStart;
-        address buyer;
-        address seller;
-        bool buyerDelivered;
-        bool sellerDelivered;
-        State state;
-        address[] takerWhiteList;
-    }
-    function getOrder(uint _orderId) external view returns (Order memory);
-
-}
-
 interface IForward20 is IBaseForward {
     function createOrderFor(
         address _creator,
@@ -62,11 +32,11 @@ interface IForward20 is IBaseForward {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -81,11 +51,11 @@ interface IForward721 is IBaseForward {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -101,11 +71,11 @@ interface IForward1155 is IBaseForward {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -128,11 +98,11 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -186,11 +156,11 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -251,11 +221,11 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         // uint _orderValidPeriod,
         // uint _deliveryStart,
         // uint _deliveryPeriod,
-        uint[] memory _times,
+        uint[3] memory _times,
         // uint _deliveryPrice, 
         // uint _buyerMargin,
         // uint _sellerMargin,
-        uint[] memory _prices,
+        uint[3] memory _prices,
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
@@ -309,9 +279,9 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         address _forward,
         address _taker,
         uint _orderId
-    ) external payable {
+    ) public payable {
         require(IForward20(_forward).margin() == address(weth), "margin not weth");
-        weth.deposit{value: msg.value}();
+        if (msg.value > 0) weth.deposit{value: msg.value}();
         // below is not necessary since if someone takeOrder, it means someone else has already created order, allowance > 0
         // uint allowance = weth.allowance(address(this), _forward);
         // if (allowance == 0) {
@@ -326,14 +296,23 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         }
     }
 
+    function multiTakeOrderFor(
+        address _forward,
+        address _taker,
+        uint[] memory _orderIds
+    ) external payable {
+        for (uint i = 0; i < _orderIds.length; i++) {
+            takeOrderFor(_forward, _taker, _orderIds[i]);
+        }
+    }
 
     function deliverFor(
         address _forward,
         address _deliverer,
         uint _orderId
-    ) external payable {
+    ) public payable {
         require(IForward20(_forward).margin() == address(weth), "margin not weth");
-        weth.deposit{value: msg.value}();
+        if (msg.value > 0) weth.deposit{value: msg.value}();
 
         // Won't consider how seller should deliver, also, how seller deposit asset token like 20, 721, 1155 
         // Instead that we take 20, 721, 1155 underlying assets from msg.sender, then approve them to forward contract
@@ -349,19 +328,53 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         }
     }
 
+    function multiDeliverFor(
+        address _forward,
+        address _deliverer,
+        uint[] memory _orderIds
+    ) external payable {
+        for (uint i = 0; i < _orderIds.length; i++) {
+            deliverFor(_forward, _deliverer, _orderIds[i]);
+        }
+    }
+    
+    
     function settle(
         address _forward,
         uint _orderId
-    ) external {
+    ) public {
         IBaseForward(_forward).settle(_orderId);
+    }
+
+    function multiSettle(
+        address _forward,
+        uint[] memory _orderIds
+    ) external payable {
+        for (uint i = 0; i < _orderIds.length; i++) {
+            settle(_forward, _orderIds[i]);
+        }
     }
 
     function cancelOrder(
         address _forward,
         uint _orderId
-    ) external payable {
+    ) public {
         // here we would return weth margin to seller or buyer, not ether
         IBaseForward(_forward).cancelOrder(_orderId);
+    }
+
+    function multiCancelOrder(
+        address _forward,
+        uint[] memory _orderIds
+    ) external payable {
+        for (uint i = 0; i < _orderIds.length; i++) {
+            cancelOrder(_forward, _orderIds[i]);
+        }
+    }
+
+
+    function ordersLength(address _forward) external view returns (uint) {
+        return IBaseForward(_forward).ordersLengh();
     }
 
     // receive ether paid from weth
