@@ -49,7 +49,7 @@ interface IBaseForward  {
     function getPricePerFullShare() external view returns (uint);
     function getBuyerAmountToDeliver(uint _orderId) external view returns (uint);
     function checkOrderState(uint _orderId) external view returns (State);
-    function ordersLengh() external view returns (uint);
+    function ordersLength() external view returns (uint);
 
     // write methods
     function takeOrderFor(address _taker, uint _orderId) external;

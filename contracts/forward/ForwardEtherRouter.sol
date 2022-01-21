@@ -301,8 +301,15 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         address _taker,
         uint[] memory _orderIds
     ) external payable {
+        require(IForward20(_forward).margin() == address(weth), "margin not weth");
+        if (msg.value > 0) weth.deposit{value: msg.value}();
+
         for (uint i = 0; i < _orderIds.length; i++) {
-            takeOrderFor(_forward, _taker, _orderIds[i]);
+            IBaseForward(_forward).takeOrderFor(_taker, _orderIds[i]);
+        }
+        if (weth.balanceOf(address(this)) > 0) {
+            weth.withdraw(weth.balanceOf(address(this)));
+            payable(msg.sender).transfer(address(this).balance);
         }
     }
 
@@ -333,8 +340,17 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
         address _deliverer,
         uint[] memory _orderIds
     ) external payable {
+        require(IForward20(_forward).margin() == address(weth), "margin not weth");
+        if (msg.value > 0) weth.deposit{value: msg.value}();
+        
         for (uint i = 0; i < _orderIds.length; i++) {
-            deliverFor(_forward, _deliverer, _orderIds[i]);
+            IBaseForward.Order memory order = IBaseForward(_forward).getOrder(_orderIds[i]);
+            require(_deliverer == order.buyer, "seller can interact with forward directly"); 
+            IBaseForward(_forward).deliverFor(_deliverer, _orderIds[i]);
+        }
+        if (weth.balanceOf(address(this)) > 0) {
+            weth.withdraw(weth.balanceOf(address(this)));
+            payable(msg.sender).transfer(address(this).balance);
         }
     }
     
@@ -349,7 +365,7 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
     function multiSettle(
         address _forward,
         uint[] memory _orderIds
-    ) external payable {
+    ) external {
         for (uint i = 0; i < _orderIds.length; i++) {
             settle(_forward, _orderIds[i]);
         }
@@ -366,7 +382,7 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
     function multiCancelOrder(
         address _forward,
         uint[] memory _orderIds
-    ) external payable {
+    ) external {
         for (uint i = 0; i < _orderIds.length; i++) {
             cancelOrder(_forward, _orderIds[i]);
         }
@@ -374,7 +390,7 @@ contract ForwardEtherRouter is ERC721Holder, ERC1155Holder {
 
 
     function ordersLength(address _forward) external view returns (uint) {
-        return IBaseForward(_forward).ordersLengh();
+        return IBaseForward(_forward).ordersLength();
     }
 
     // receive ether paid from weth

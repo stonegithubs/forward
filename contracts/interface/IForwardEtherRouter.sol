@@ -77,5 +77,5 @@ interface IForwardEtherRouter  {
         uint _orderId
     ) external;
 
-    function ordersLengh(address _forward) external view returns (uint);
+    function ordersLength(address _forward) external view returns (uint);
 }

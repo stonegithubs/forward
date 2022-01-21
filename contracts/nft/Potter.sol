@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./ERC721A.sol";
 import "../interface/IForwardEtherRouter.sol";
 
-contract Porter is ERC721A, Ownable {
+contract Potter is ERC721A, Ownable {
     
-    address private signer;
-    address public immutable forward;
-    IForwardEtherRouter public immutable router;
+    address public signer_;
+    address public forward;
+    IForwardEtherRouter public router;
     uint256 public tokensReserved;
     uint256 public immutable maxMint;
     uint256 public immutable maxSupply;
@@ -43,25 +43,30 @@ contract Porter is ERC721A, Ownable {
         address _signer,
         uint256 _maxBatchSize,
         uint256 _collectionSize,
-        uint256 _reserveAmount,
-        address _forward,
-        address _router
+        uint256 _reserveAmount
     ) ERC721A("Test NFT Name", "TestSymbol", _maxBatchSize, _collectionSize) {
         baseURI = _initBaseURI;
-        signer = _signer;
+        signer_ = _signer;
         maxMint = _maxBatchSize;
         maxSupply = _collectionSize;
         reserveAmount = _reserveAmount;
-        forward = _forward;
-        router = IForwardEtherRouter(_router);
     }
-
+    
+    // TODO: delete
+    function verifySig(address _sender, string calldata _salt, bytes memory _sig)
+        public
+        view
+        returns (address)
+    {
+        return ECDSA.recover(keccak256(abi.encode(_sender, address(this), _salt)), _sig);
+    }
+    
     function _verifySig(address _sender, string calldata _salt, bytes memory _sig)
         internal
         view
         returns (bool)
     {
-        return ECDSA.recover(keccak256(abi.encode(_sender, address(this), _salt)), _sig) == signer;
+        return ECDSA.recover(keccak256(abi.encode(_sender, address(this), _salt)), _sig) == signer_;
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -92,6 +97,7 @@ contract Porter is ERC721A, Ownable {
         emit ReservedToken(msg.sender, recipient, amount);
     }
 
+    // TODO: reduce gas fee, add option for minter to buy nft directly, save ether to self and open interface for everyone to takeOrderFor for owner() in batch
     function presaleMint(
         uint256 amount,
         string calldata salt,
@@ -114,7 +120,7 @@ contract Porter is ERC721A, Ownable {
         );
 
         _safeMint(msg.sender, amount);
-        _createForwardOrders(msg.sender, amount);
+        // _createForwardOrders(msg.sender, amount);
         refundIfOver(PRICE * amount);
 
         emit Minted(msg.sender, amount);
@@ -154,58 +160,55 @@ contract Porter is ERC721A, Ownable {
 
     function _createForwardOrders(address sender, uint amount) internal {
         uint supply = totalSupply();
-        uint[] memory tokenIds = new uint[](1);
+        uint orderIndex = router.ordersLength(forward);
 
-        uint orderIndex = router.ordersLengh(forward);
+        /** This is for forward all nft separately */
+        // uint[] memory tokenIds = new uint[](1);
+        // for (uint i = amount; i > 0; i--) {
+        //     tokenIds[0] = supply - i;
+        //     router.createOrder721For{value: 0}(
+        //         forward, 
+        //         sender, 
+        //         tokenIds, 
+        //         [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
+        //         [PRICE, PRICE, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
+        //         new address[](0),   /** order taker whitelist */
+        //         false,  /** if sender is willing to deposit nft now  */
+        //         true    /**  if sender is seller */
+        //     );
+        //     // router.takeOrderFor{value: PRICE}(forward, owner(), orderIndex);
+        //     orderIndex++;
+        // }
+
+        /** This is for forward all nft once for all */
+        uint[] memory tokenIds = new uint[](amount);
         for (uint i = amount; i > 0; i--) {
-            tokenIds[0] = supply - i;
-            router.createOrder721For(
-                forward, 
-                sender, 
-                tokenIds, 
-                [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
-                [PRICE, PRICE, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
-                new address[](0),   /** order taker whitelist */
-                false,  /** if sender is willing to deposit nft now  */
-                true    /**  if sender is seller */
-            );
-            router.takeOrderFor{value: PRICE}(forward, owner(), orderIndex);
-            orderIndex++;
+            tokenIds[amount - i] = supply - i;
         }
-        
+        uint value = amount * PRICE;
+        router.createOrder721For{value: 0}(
+            forward, 
+            sender, 
+            tokenIds, 
+            [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
+            [value, value, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
+            new address[](0),   /** order taker whitelist */
+            false,  /** if sender is willing to deposit nft now  */
+            true    /**  if sender is seller */
+        );
+        router.takeOrderFor{value: value}(forward, owner(), orderIndex);
+
     }
 
     function _calcDeliveryStart(uint id) internal view returns (uint) {
         return block.timestamp + deliveryMin + (deliveryMax - deliveryMin) * (maxSupply - id) / maxSupply;
     }
 
-    function withdraw() external onlyOwner {
-        require(
-            status == Status.Finished,
-            "XRC: invalid status for withdrawn."
-        );
-        require(!balanceWithdrawn, "XRC: balance has already been withdrawn.");
-
-        uint256 balance = address(this).balance;
-
-        uint256 v1 = 3.5 * 10**18;
-        uint256 v2 = 0.5 * 10**18;
-        uint256 v3 = balance - v1 - v2;
-
-        balanceWithdrawn = true;
-
-        (bool success1, ) = payable(0xFcda4EE4E98F3d25CB2F4e3C164deAF277372f35)
-            .call{value: v1}("");
-        (bool success2, ) = payable(0xb811EC5250796966f1400C8e30E5e8A2bC44a068)
-            .call{value: v2}("");
-        (bool success3, ) = payable(0xe9EAA95B03f40F13C5609b54e40C155e6f77f648)
-            .call{value: v3}("");
-
-        require(success1, "Transfer 1 failed.");
-        require(success2, "Transfer 2 failed.");
-        require(success3, "Transfer 3 failed.");
+    function setForward(address _forward, address _router) external onlyOwner {
+        forward = _forward;
+        router = IForwardEtherRouter(_router);
     }
-
+    
     function setBaseURI(string calldata newBaseURI) external onlyOwner {
         baseURI = newBaseURI;
         emit BaseURIChanged(newBaseURI);
@@ -217,8 +220,8 @@ contract Porter is ERC721A, Ownable {
     }
 
     function setSigner(address _signer) external onlyOwner {
-        signer = _signer;
-        emit SignerChanged(signer);
+        signer_ = _signer;
+        emit SignerChanged(signer_);
     }
 
     function setOwnersExplicit(uint256 quantity)
@@ -238,5 +241,11 @@ contract Porter is ERC721A, Ownable {
         returns (TokenOwnership memory)
     {
         return ownershipOf(tokenId);
+    }
+
+    receive() external payable {
+        if (msg.sender != address(router)) {
+            payable(msg.sender).transfer(msg.value);
+        }
     }
 }
