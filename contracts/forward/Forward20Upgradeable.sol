@@ -33,7 +33,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external {
+    ) external returns (uint orderId) {
         _onlyNotPaused();
 
         // check if msg.sender wants to deposit _underlyingAmount amount of want directly
@@ -42,7 +42,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         }
 
         // create order
-        _createOrderFor(
+        orderId = _createOrderFor(
             _creator,
             // _orderValidPeriod,
             // _deliveryStart, 
@@ -58,6 +58,7 @@ contract Forward20Upgradeable is BaseForwardUpgradeable {
         );
 
         underlyingAssets.push(_underlyingAmount);
+        return orderId;
     }
 
     function _pullUnderlyingAssetsToSelf(uint _orderId) internal virtual override {

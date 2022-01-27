@@ -48,7 +48,7 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable, ERC1155HolderUpgradea
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external {
+    ) external returns (uint orderId) {
         _onlyNotPaused();
         require(_ids.length == _amounts.length, "!len");
         // check if msg.sender wants to deposit _underlyingAmount amount of want directly
@@ -57,7 +57,7 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable, ERC1155HolderUpgradea
         }
 
         // create order
-        _createOrderFor(
+        orderId = _createOrderFor(
             _creator,
             // _orderValidPeriod,
             // _deliveryStart, 
@@ -72,10 +72,9 @@ contract Forward1155Upgradeable is BaseForwardUpgradeable, ERC1155HolderUpgradea
             _isSeller
         );
 
-        uint curOrderIndex = ordersLength - 1;
         for (uint i = 0; i < _ids.length; i++) {
-            underlyingAssets_[curOrderIndex].ids.push(_ids[i]);
-            underlyingAssets_[curOrderIndex].amounts.push(_amounts[i]);
+            underlyingAssets_[orderId].ids.push(_ids[i]);
+            underlyingAssets_[orderId].amounts.push(_amounts[i]);
         }
     }
 

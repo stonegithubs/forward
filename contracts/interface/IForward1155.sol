@@ -20,7 +20,7 @@ interface IForward721 is IBaseForward  {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external;
+    ) external returns (uint orderId);
     
     function underlyingAssets(uint _orderId) external view returns (uint[] memory ids, uint[] memory amounts);
 }

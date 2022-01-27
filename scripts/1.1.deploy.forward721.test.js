@@ -7,6 +7,9 @@ const { deploy } = require('@openzeppelin/hardhat-upgrades/dist/utils')
 const { time } = require('@openzeppelin/test-helpers')
 const { ethers, upgrades, network, web3 } = require('hardhat')
 const utils = require('./utils')
+const Web3 = require('web3')
+const toBN = Web3.utils.toBN
+const toWei = Web3.utils.toWei
 
 async function main() {
     // Hardhat always runs the compile task when running scripts with its command
@@ -100,8 +103,6 @@ async function main() {
         // console.log("sleeping done")
         // return
 
-        const Web3 = require('web3')
-        const toWei = Web3.utils.toWei
         const dai = await Token20.attach(config[network.name].deployed.dai)
         const nft = await Token721.attach(config[network.name].deployed.nft)
         // create order
@@ -112,7 +113,7 @@ async function main() {
             'status  = ',
             (await forward721nftdai.checkOrderState(orderId)).toString()
         )
-        const tokenIds = [0 + orderId, 10000 + orderId]
+        const tokenIds = [1 + orderId]
         const deliveryPrice = toWei('0.0000001', 'ether')
 
         let tx
@@ -130,13 +131,13 @@ async function main() {
                 (await web3.eth.getBlock(await web3.eth.getBlockNumber()))
                     .timestamp
             )
-            // return
+
             let unitDuration = 60 // seconds
             let orderValidPeriod = 3 * unitDuration
             let nowToDeliverPeriod = orderValidPeriod + 3 * unitDuration
-            // return
+
             let deliverStart = now + nowToDeliverPeriod
-            let deliveryPeriod = 3 * unitDuration
+            let deliveryPeriod = 24 * 60 * unitDuration
             let buyerMargin = toWei('0.00000001', 'ether')
             let sellerMargin = toWei('0.00000001', 'ether')
             let deposit = false
@@ -144,16 +145,44 @@ async function main() {
             let validTill
             let order
 
-            //   tx = await dai
-            //     .connect(alice)
-            //     .mint(sellerMargin, { gasLimit: network.config.gasLimit })
-            //   // await tx.wait();
-            //   tx = await dai
-            //     .connect(alice)
-            //     .approve(forward721nftdai.address, sellerMargin, {
-            //       gasLimit: network.config.gasLimit,
-            //     })
-            // await tx.wait();
+            // mint dai if needed
+            {
+                let daiBal = (await dai.balanceOf(alice.address)).toString()
+                if (toBN(daiBal).lt(toBN(sellerMargin))) {
+                    tx = await dai.connect(alice).mint(sellerMargin, {
+                        gasLimit: network.config.gasLimit,
+                    })
+                    // await tx.wait()
+                }
+                console.log(
+                    'daiBal ',
+                    (await dai.balanceOf(alice.address)).toString()
+                )
+            }
+            // approve dai if needed
+            {
+                let daiAllowance = (
+                    await dai.allowance(alice.address, forward721nftdai.address)
+                ).toString()
+                console.log(
+                    'daiallowance ',
+                    (
+                        await dai.allowance(
+                            alice.address,
+                            forward721nftdai.address
+                        )
+                    ).toString()
+                )
+                if (toBN(daiAllowance).lt(toBN(sellerMargin))) {
+                    tx = await dai
+                        .connect(alice)
+                        .approve(forward721nftdai.address, sellerMargin, {
+                            gasLimit: network.config.gasLimit,
+                        })
+                    // await tx.wait()
+                }
+            }
+
             console.log([
                 orderValidPeriod,
                 deliverStart.toString(),
@@ -258,6 +287,7 @@ async function main() {
                 'gasUsed-----deliverFor 721----: ',
                 receipt.gasUsed.toString()
             )
+            return
             // buyer deliver, meanwhile settle it
             tx = await dai
                 .connect(bob)

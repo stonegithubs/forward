@@ -18,7 +18,7 @@ interface IForwardEtherRouter  {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external payable;
+    ) external payable returns (uint orderId);
 
     function createOrder721For(
         address _forward721,
@@ -35,7 +35,7 @@ interface IForwardEtherRouter  {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external payable;
+    ) external payable returns (uint orderId);
 
     function createOrder1155For(
         address _forward1155,
@@ -53,7 +53,7 @@ interface IForwardEtherRouter  {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external payable;
+    ) external payable returns (uint orderId);
 
     function takeOrderFor(
         address _forward,
@@ -78,4 +78,5 @@ interface IForwardEtherRouter  {
     ) external;
 
     function ordersLength(address _forward) external view returns (uint);
+    function weth() external view returns (address);
 }

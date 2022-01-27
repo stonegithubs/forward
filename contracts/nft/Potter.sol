@@ -6,11 +6,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./ERC721A.sol";
 import "../interface/IForwardEtherRouter.sol";
+import "../interface/IForward721.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../interface/IWETH.sol";
 
 contract Potter is ERC721A, Ownable {
     
     address public signer_;
-    address public forward;
+    IForward721 public forward;
     IForwardEtherRouter public router;
     uint256 public tokensReserved;
     uint256 public immutable maxMint;
@@ -19,6 +23,7 @@ contract Potter is ERC721A, Ownable {
     uint256 public constant PRICE = 0.001 ether;
     uint256 public constant deliveryMin = 1 weeks;
     uint256 public constant deliveryMax = 30 days;
+    IWETH public weth;
     bool public balanceWithdrawn;
     
     enum Status {
@@ -101,9 +106,11 @@ contract Potter is ERC721A, Ownable {
     function presaleMint(
         uint256 amount,
         string calldata salt,
-        bytes calldata sig
+        bytes calldata sig,
+        uint insuranceAmt
     ) external payable {
         require(status == Status.PreSale, "XRC: Presale is not active.");
+        require(insuranceAmt <= amount, "insurance amount illegal");
         require(
             tx.origin == msg.sender,
             "XRC: contract is not allowed to mint."
@@ -120,13 +127,13 @@ contract Potter is ERC721A, Ownable {
         );
 
         _safeMint(msg.sender, amount);
-        // _createForwardOrders(msg.sender, amount);
+        _createForwardOrders(msg.sender, insuranceAmt);
         refundIfOver(PRICE * amount);
 
         emit Minted(msg.sender, amount);
     }
 
-    function mint() external payable {
+    function mint(bool insurance) external payable {
         require(status == Status.PublicSale, "XRC: Public sale is not active.");
         require(
             tx.origin == msg.sender,
@@ -143,7 +150,7 @@ contract Potter is ERC721A, Ownable {
         );
 
         _safeMint(msg.sender, 1);
-        _createForwardOrders(msg.sender, 1);
+        _createForwardOrders(msg.sender, insurance ? 1 : 0);
         publicMinted[msg.sender] = true;
         refundIfOver(PRICE);
 
@@ -159,26 +166,8 @@ contract Potter is ERC721A, Ownable {
 
 
     function _createForwardOrders(address sender, uint amount) internal {
+        if (amount == 0) return;
         uint supply = totalSupply();
-        uint orderIndex = router.ordersLength(forward);
-
-        /** This is for forward all nft separately */
-        // uint[] memory tokenIds = new uint[](1);
-        // for (uint i = amount; i > 0; i--) {
-        //     tokenIds[0] = supply - i;
-        //     router.createOrder721For{value: 0}(
-        //         forward, 
-        //         sender, 
-        //         tokenIds, 
-        //         [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
-        //         [PRICE, PRICE, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
-        //         new address[](0),   /** order taker whitelist */
-        //         false,  /** if sender is willing to deposit nft now  */
-        //         true    /**  if sender is seller */
-        //     );
-        //     // router.takeOrderFor{value: PRICE}(forward, owner(), orderIndex);
-        //     orderIndex++;
-        // }
 
         /** This is for forward all nft once for all */
         uint[] memory tokenIds = new uint[](amount);
@@ -186,18 +175,38 @@ contract Potter is ERC721A, Ownable {
             tokenIds[amount - i] = supply - i;
         }
         uint value = amount * PRICE;
-        router.createOrder721For{value: 0}(
-            forward, 
+
+        // uint orderId = router.createOrder721For{value: 0}(
+        //     address(forward), 
+        //     sender, 
+        //     tokenIds, 
+        //     [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
+        //     [value, value, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
+        //     new address[](0),   /** order taker whitelist */
+        //     false,  /** if sender is willing to deposit nft now  */
+        //     true    /**  if sender is seller */
+        // );
+        // // router.takeOrderFor{value: value}(forward, owner(), orderId);
+
+        weth.deposit{value: value}();
+        uint orderId = forward.createOrderFor(
             sender, 
             tokenIds, 
-            [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
-            [value, value, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
-            new address[](0),   /** order taker whitelist */
-            false,  /** if sender is willing to deposit nft now  */
-            true    /**  if sender is seller */
+            [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours], 
+            [value, value, 0], 
+            new address[](0), false, true
         );
-        router.takeOrderFor{value: value}(forward, owner(), orderIndex);
-
+        // router.createOrder721For{value: 0}(
+        //     address(forward), 
+        //     sender, 
+        //     tokenIds, 
+        //     [1 minutes, _calcDeliveryStart(tokenIds[0]), 24 hours],  /** 0: orderValidTime till nobody can take it, 1: deliveryTime, 2: deliveryDuration(default: 24 hours) */
+        //     [value, value, 0],  /** 0: deliveryPrice, 1: buyerMargin, 2: sellerMargin, Here, we don't charge user's margin if he decides to sell nft at delivery time */
+        //     new address[](0),   /** order taker whitelist */
+        //     false,  /** if sender is willing to deposit nft now  */
+        //     true    /**  if sender is seller */
+        // );
+        forward.takeOrderFor(owner(), orderId);
     }
 
     function _calcDeliveryStart(uint id) internal view returns (uint) {
@@ -205,8 +214,10 @@ contract Potter is ERC721A, Ownable {
     }
 
     function setForward(address _forward, address _router) external onlyOwner {
-        forward = _forward;
+        forward = IForward721(_forward);
         router = IForwardEtherRouter(_router);
+        weth = IWETH(router.weth());
+        weth.approve(_forward, type(uint).max);
     }
     
     function setBaseURI(string calldata newBaseURI) external onlyOwner {

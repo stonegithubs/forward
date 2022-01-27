@@ -76,7 +76,7 @@ module.exports = {
                 `0x${config.rinkeby.privateKeys[2]}`,
             ],
             // gasPrice: 1.1 * 1000000000, // 1.1 gwei
-            // gasLimit: 5000000, //
+            gasLimit: 5000000, //
             gas: 2100000,
             gasPrice: 8000000000,
         },

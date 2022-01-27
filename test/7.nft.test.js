@@ -16,7 +16,8 @@ describe('Forward721 TestCase with marginToken as ERC20', function () {
         this.alice = this.signers[0]
         this.bob = this.signers[1]
         this.carol = this.signers[2]
-        this.signer = this.signers[3]
+        this.dog = this.signers[3]
+        this.signer = this.signers[4]
         this.WETH = await ethers.getContractFactory('WETH9')
         this.Dai = await ethers.getContractFactory('MockERC20')
         this.Potter = await ethers.getContractFactory('Potter')
@@ -133,14 +134,13 @@ describe('Forward721 TestCase with marginToken as ERC20', function () {
         console.log('signerWallet.privateKey = ', signerWallet.privateKey)
         console.log('signerWallet.address = ', signerWallet.address)
         const minter = this.bob
-        const sender = minter.address
         const salt = 'salt'
 
         const digest = ethers.utils.keccak256(
             ethers.utils.defaultAbiCoder.encode(
                 ['address', 'address', 'string'],
                 [
-                    sender /** pre minter address */,
+                    minter.address /** pre minter address */,
                     this.potter.address /** potter contract address */,
                     salt /** random salt */,
                 ]
@@ -156,16 +156,60 @@ describe('Forward721 TestCase with marginToken as ERC20', function () {
         expect(ethers.utils.recoverAddress(digest, sigHex)).to.equal(
             signerWallet.address
         )
-        expect(await this.potter.verifySig(sender, salt, sigHex)).to.equal(
-            signerWallet.address
-        )
+        expect(
+            await this.potter.verifySig(minter.address, salt, sigHex)
+        ).to.equal(signerWallet.address)
 
         await this.potter
             .connect(this.bob)
-            .presaleMint(2, 'salt', sigHex, { value: toWei('0.5') })
+            .presaleMint(2, 'salt', sigHex, 2, { value: toWei('0.5') })
         expect(
             (await this.potter.balanceOf(this.bob.address)).toString()
         ).to.equal('2')
+
+        // run the code above to check gas consumption
+        {
+            let minter = this.carol
+            const digest = ethers.utils.keccak256(
+                ethers.utils.defaultAbiCoder.encode(
+                    ['address', 'address', 'string'],
+                    [
+                        minter.address /** pre minter address */,
+                        this.potter.address /** potter contract address */,
+                        salt /** random salt */,
+                    ]
+                )
+            )
+            const sig = signingKey.signDigest(digest)
+            const sigHex = ethers.utils.joinSignature(sig)
+            await this.potter
+                .connect(minter)
+                .presaleMint(2, 'salt', sigHex, 1, { value: toWei('0.5') })
+            expect(
+                (await this.potter.balanceOf(minter.address)).toString()
+            ).to.equal('2')
+        }
+        {
+            let minter = this.dog
+            const digest = ethers.utils.keccak256(
+                ethers.utils.defaultAbiCoder.encode(
+                    ['address', 'address', 'string'],
+                    [
+                        minter.address /** pre minter address */,
+                        this.potter.address /** potter contract address */,
+                        salt /** random salt */,
+                    ]
+                )
+            )
+            const sig = signingKey.signDigest(digest)
+            const sigHex = ethers.utils.joinSignature(sig)
+            await this.potter
+                .connect(minter)
+                .presaleMint(2, 'salt', sigHex, 0, { value: toWei('0.5') })
+            expect(
+                (await this.potter.balanceOf(minter.address)).toString()
+            ).to.equal('2')
+        }
     })
 })
 

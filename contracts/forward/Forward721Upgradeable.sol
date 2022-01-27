@@ -44,7 +44,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) external {
+    ) external returns (uint orderId) {
         _onlyNotPaused();
         // check if msg.sender wants to deposit tokenId nft directly
         if (_deposit && _isSeller) {
@@ -52,7 +52,7 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
         }
 
         // create order
-        _createOrderFor(
+        orderId = _createOrderFor(
             _creator,
             // _orderValidPeriod,
             // _deliveryStart, 
@@ -67,11 +67,9 @@ contract Forward721Upgradeable is BaseForwardUpgradeable, ERC721HolderUpgradeabl
             _isSeller
         );
 
-        uint curOrderIndex = ordersLength - 1;
         for (uint i = 0; i < _tokenIds.length; i++) {
-            underlyingAssets_[curOrderIndex].amounts.push(_tokenIds[i]);
+            underlyingAssets_[orderId].amounts.push(_tokenIds[i]);
         }
-        
     }
     
     /**

@@ -296,7 +296,7 @@ contract BaseForwardUpgradeable is Initializable {
         address[] memory _takerWhiteList,
         bool _deposit,
         bool _isSeller
-    ) internal virtual {
+    ) internal virtual returns (uint) {
         require(_prices[0] < type(uint128).max && _prices[1] < type(uint128).max && _prices[2] < type(uint128).max, "overflow");
         require(uint(_prices[1].add(_prices[2])) < type(uint128).max, "deliver may overflow");
         require(uint(_times[1]).add(_times[2]) < type(uint40).max && _getBlockTimestamp().add(_times[0]) < uint(_times[1]), "!time");
@@ -333,7 +333,7 @@ contract BaseForwardUpgradeable is Initializable {
             }
         }
         emit CreateOrder(index, _creator);
-    
+        return index;
     }
 
     function _cancelOrder(uint _orderId) internal virtual {
