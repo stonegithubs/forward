@@ -64,14 +64,14 @@ contract BaseForwardUpgradeable is Initializable {
     event Settle(uint orderId);
     event CancelOrder(uint orderId);
 
-    constructor() {}
+    // constructor() {}
 
     
     /***************** initializer begin **********************/
     function __BaseForward__init(
         address _want,
         address _margin
-    ) public initializer {
+    ) public onlyInitializing {
         factory = msg.sender;
         IHogletFactory _factory = IHogletFactory(factory);
         require(_factory.ifMarginSupported(_margin), "!margin");

@@ -31,14 +31,14 @@ contract UpgradeableBeacon is IBeacon, OwnableUpgradeable {
     // Notice: dev changed construtor into init
     function __UpgradeableBeacon__init(address implementation_) public initializer {
         __Ownable_init();
-        _setImplementation(implementation_);
+        _setChildImplementation(implementation_);
     }
 
 
     /**
      * @dev Returns the current implementation address.
      */
-    function implementation() public view virtual override returns (address) {
+    function childImplementation() public view virtual override returns (address) {
         return _implementation;
     }
 
@@ -50,11 +50,11 @@ contract UpgradeableBeacon is IBeacon, OwnableUpgradeable {
      * Requirements:
      *
      * - msg.sender must be the owner of the contract.
-     * - `newImplementation` must be a contract.
+     * - `newChildImplementation` must be a contract.
      */
-    function upgradeTo(address newImplementation) public virtual onlyOwner {
-        _setImplementation(newImplementation);
-        emit Upgraded(newImplementation);
+    function upgradeChildTo(address newChildImplementation) public virtual onlyOwner {
+        _setChildImplementation(newChildImplementation);
+        emit Upgraded(newChildImplementation);
     }
 
     /**
@@ -62,10 +62,10 @@ contract UpgradeableBeacon is IBeacon, OwnableUpgradeable {
      *
      * Requirements:
      *
-     * - `newImplementation` must be a contract.
+     * - `newChildImplementation` must be a contract.
      */
-    function _setImplementation(address newImplementation) private {
-        require(AddressUpgradeable.isContract(newImplementation), "UpgradeableBeacon: implementation is not a contract");
-        _implementation = newImplementation;
+    function _setChildImplementation(address newChildImplementation) private {
+        require(AddressUpgradeable.isContract(newChildImplementation), "UpgradeableBeacon: child implementation is not a contract");
+        _implementation = newChildImplementation;
     }
 }

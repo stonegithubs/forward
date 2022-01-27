@@ -14,7 +14,7 @@ import "../../forward/Forward1155Upgradeable.sol";
 abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
 
     uint256 public fee;
-    uint256 public constant base = 10000;
+    uint256 public base;
     
     address[] public enabledMargins;
     mapping(address => int256) public supportedMargins;
@@ -38,7 +38,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         uint index
     );
 
-    constructor(){}
+    // constructor(){}
 
     function __FactoryUpgradeable__init(
         address _forwardImp,
@@ -47,7 +47,7 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
         uint _fee
     ) public initializer {
         __UpgradeableBeacon__init(_forwardImp);
-
+        base = 10000;
         poolDeployer = owner();
 
         enabledMargins.push(address(0));
@@ -181,9 +181,9 @@ abstract contract BaseFactoryUpgradeable is UpgradeableBeacon, IHogletFactory {
     /****************** For Emergency Only Begin *********************/
     // here we override UpgradeableBeacon's implementation 
     // in case forward is under attack
-    function implementation() public view virtual override(UpgradeableBeacon, IBeacon) returns (address) {
+    function childImplementation() public view virtual override(UpgradeableBeacon, IBeacon) returns (address) {
         require(!paused, "paused");
-        return super.implementation();
+        return super.childImplementation();
     }
 
     // when owner invoke pause, all the created forward contracts should stop working
